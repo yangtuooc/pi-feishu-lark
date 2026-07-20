@@ -170,8 +170,7 @@ export default function feishuExtension(pi: ExtensionAPI) {
           key: stopTask.key,
           runId: stopTask.runId,
           status,
-          phase: result.message,
-          body: status === "stopped" ? "" : undefined,
+          note: result.message || "已停止",
         });
       }
       const resumePage = parseResumePageActionValue(action.value);

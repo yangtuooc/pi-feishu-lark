@@ -126,21 +126,16 @@ export class FeishuMessageHandler {
       const card = new ReplyCard(key, msg.messageId, transport);
       await card.start();
 
-      const useStreaming = cfg?.streamingReply !== false;
+      // 卡片只展示最终用户回复；不流式过程、不展示阶段
       await this.conversations.promptWithImages(
         key,
         prompt,
         imageInputs,
         async (reply) => {
-          // 最终答案写入同一张卡，不再 replyText 第二条
           await card.completeWithAnswer(reply || "（无内容）");
         },
         card,
-        useStreaming
-          ? (delta) => {
-              card.append(delta);
-            }
-          : undefined,
+        undefined,
       );
       await markFeishuMessage(msg.messageId, "replied");
     } catch (error) {

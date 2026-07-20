@@ -2,48 +2,34 @@
 export type ReplyCardStatus = "running" | "done" | "failed" | "stopped" | "inactive";
 
 export const STOP_ACTION = "pi_feishu_stop_task";
-const MAX_PHASE_CHARS = 96;
+const MAX_NOTE_CHARS = 96;
 
+/**
+ * 单卡结构（全程保留 header，避免闪动）：
+ * - running: 标题「回复中」+ 占位 + [停止]；不展示进度/过程
+ * - done:    标题「回复」+ 最终用户可见正文
+ * - stopped/failed: 标题 + 简短说明（可选半段用户正文）
+ */
 export function buildReplyCard(input: {
   key: string;
   status: ReplyCardStatus;
-  phase?: string;
+  /** 仅 stopped/failed 使用的短说明；running/done 忽略 */
+  note?: string;
+  /** 用户可见正文（done 为最终回复；stopped 可为已生成半段） */
   body?: string;
   runId?: string;
 }) {
   const running = input.status === "running";
   const body = (input.body || "").trim();
-  const phase = input.phase ? normalizePhase(input.phase) : undefined;
+  const note = input.note ? normalizeNote(input.note) : undefined;
   const elements: object[] = [];
 
-  if (running && phase) {
-    elements.push({
-      tag: "div",
-      text: { tag: "lark_md", content: `进度：${phase}` },
-    });
-  } else if (!running && phase && input.status !== "done") {
-    elements.push({
-      tag: "div",
-      text: { tag: "lark_md", content: phase },
-    });
-  }
-
-  if (body) {
-    if (elements.length) {
-      elements.push({ tag: "hr" });
-    }
-    elements.push({
-      tag: "div",
-      text: { tag: "lark_md", content: body },
-    });
-  } else if (running) {
+  if (running) {
+    // 进行中不展示模型过程，仅占位 + 停止
     elements.push({
       tag: "div",
       text: { tag: "lark_md", content: "…" },
     });
-  }
-
-  if (running) {
     elements.push({
       tag: "action",
       actions: [
@@ -55,13 +41,32 @@ export function buildReplyCard(input: {
         },
       ],
     });
-  }
-
-  if (!elements.length) {
+  } else if (input.status === "done") {
     elements.push({
       tag: "div",
-      text: { tag: "lark_md", content: " " },
+      text: { tag: "lark_md", content: body || " " },
     });
+  } else {
+    // stopped / failed / inactive
+    if (note) {
+      elements.push({
+        tag: "div",
+        text: { tag: "lark_md", content: note },
+      });
+    }
+    if (body) {
+      if (elements.length) elements.push({ tag: "hr" });
+      elements.push({
+        tag: "div",
+        text: { tag: "lark_md", content: body },
+      });
+    }
+    if (!elements.length) {
+      elements.push({
+        tag: "div",
+        text: { tag: "lark_md", content: " " },
+      });
+    }
   }
 
   return {
@@ -87,51 +92,10 @@ export function parseStopTaskActionValue(value: unknown): { key: string; runId?:
   };
 }
 
-export function describePiEvent(event: unknown): string | undefined {
-  if (!event || typeof event !== "object") return undefined;
-  const raw = event as any;
-  switch (raw.type) {
-    case "agent_start":
-      return "开始";
-    case "turn_start":
-      return typeof raw.turnIndex === "number" ? `第 ${raw.turnIndex + 1} 轮` : "新一轮";
-    case "message_start":
-      return raw.message?.role === "assistant" ? "生成回复" : undefined;
-    case "message_update":
-      return describeAssistantEvent(raw.assistantMessageEvent);
-    case "tool_execution_start":
-      return withBriefJson(`工具：${raw.toolName || "tool"}`, raw.args);
-    case "tool_execution_end":
-      return `工具结束：${raw.toolName || "tool"}${raw.isError ? "（失败）" : ""}`;
-    case "compaction_start":
-      return "整理上下文";
-    case "auto_retry_start":
-      return typeof raw.attempt === "number" ? `重试 ${raw.attempt}/${raw.maxAttempts || "?"}` : "重试中";
-    case "auto_retry_end":
-      return raw.success === false ? "重试失败" : "重试完成";
-    default:
-      return undefined;
-  }
-}
-
-function describeAssistantEvent(event: any) {
-  if (!event?.type) return "生成中";
-  if (event.type === "toolcall_end" && event.toolCall?.name) return `工具：${event.toolCall.name}`;
-  if (event.type === "done") return "生成中";
-  if (event.type === "error" && event.reason) return `错误：${event.reason}`;
-  if (event.type.endsWith("_delta")) return undefined;
-  return undefined;
-}
-
-function withBriefJson(prefix: string, value: unknown) {
-  if (value === undefined || value === null) return prefix;
-  return normalizePhase(`${prefix} ${JSON.stringify(value)}`);
-}
-
-export function normalizePhase(text: string) {
+function normalizeNote(text: string) {
   const compact = text.replace(/\s+/g, " ").trim();
-  if (compact.length <= MAX_PHASE_CHARS) return compact;
-  return `${compact.slice(0, MAX_PHASE_CHARS - 1)}…`;
+  if (compact.length <= MAX_NOTE_CHARS) return compact;
+  return `${compact.slice(0, MAX_NOTE_CHARS - 1)}…`;
 }
 
 function titleForStatus(status: ReplyCardStatus) {
@@ -150,7 +114,7 @@ function headerTemplate(status: ReplyCardStatus) {
   return "blue";
 }
 
-export function defaultFinalPhase(status: Exclude<ReplyCardStatus, "running" | "inactive">): string | undefined {
+export function defaultFinalNote(status: Exclude<ReplyCardStatus, "running" | "inactive">): string | undefined {
   if (status === "done") return undefined;
   if (status === "failed") return "处理失败";
   return "已停止";
