@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.5](https://github.com/yangtuooc/pi-feishu-lark/compare/v0.4.4...v0.4.5) (2026-07-20)
+
+
+### Bug Fixes
+
+* restore streaming via session-level text_delta path ([c1c479f](https://github.com/yangtuooc/pi-feishu-lark/commit/c1c479f962e123efa2f15a7d931dcaa8ca9d6037))
+
 ## [0.4.4](https://github.com/yangtuooc/pi-feishu-lark/compare/v0.4.3...v0.4.4) (2026-07-20)
 
 
