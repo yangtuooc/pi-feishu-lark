@@ -12,7 +12,7 @@ import { FeishuDelivery } from "./delivery.js";
 import { acquireGatewayLock, gatewayLockPath, readGatewayOwner, type GatewayLockHandle, type GatewayOwner } from "./gateway-lock.js";
 import { FeishuMessageHandler } from "./message-handler.js";
 import { runSetup, uiConfirm } from "./setup.js";
-import { buildTaskStatusCard, parseStopTaskActionValue } from "./task-status-card.js";
+import { buildReplyCard, parseStopTaskActionValue } from "./reply-card.js";
 import { BotUnavailableError, FeishuTransport } from "./transport.js";
 import type { FeishuConfig, FeishuStatus } from "./types.js";
 
@@ -152,9 +152,8 @@ export default function feishuExtension(pi: ExtensionAPI) {
           cardMessageId: action.messageId,
           chatId: action.chatId,
         });
-        const result = await conversations.stopConversation(stopTask.key, async (reply) => {
-          await transport?.replyText(action.messageId, reply);
-        }, stopTask.runId);
+        // 停止时由 ReplyCard.stopImmediately 更新同一张卡；回调不再另发文本
+        const result = await conversations.stopConversation(stopTask.key, async () => undefined, stopTask.runId);
         const status = result.status === "stopped"
           ? "stopped"
           : result.status === "failed"
@@ -166,11 +165,13 @@ export default function feishuExtension(pi: ExtensionAPI) {
           cardMessageId: action.messageId,
           result: result.status,
         });
-        return buildTaskStatusCard({
+        // 卡片回调同步返回最终样式（与 patch 一致，带 header）
+        return buildReplyCard({
           key: stopTask.key,
           runId: stopTask.runId,
           status,
           phase: result.message,
+          body: status === "stopped" ? "" : undefined,
         });
       }
       const resumePage = parseResumePageActionValue(action.value);

@@ -5,8 +5,7 @@ import { claimFeishuMessage, markFeishuMessage } from "./dedupe-store.js";
 import { debugLog } from "./debug.js";
 import { loadConfig } from "./config.js";
 import { conversationKey, conversationLabel, buildPromptWithQuote, getCommandList, normalizeForDedupe, parseBotCommand, parseMessageInput, pruneRecentMap } from "./messages.js";
-import { StreamingReply } from "./streaming-reply.js";
-import { TaskStatusCard } from "./task-status-card.js";
+import { ReplyCard } from "./reply-card.js";
 import type { FeishuBridgeStore } from "./bridge-store.js";
 import type { FeishuTransport } from "./transport.js";
 import type { FeishuMessage } from "./types.js";
@@ -123,41 +122,23 @@ export class FeishuMessageHandler {
 
       const basePrompt = buildPrompt(msg, text, fileSections, imageInputs, skippedImageCount, modelSupportsImage, downloadErrors);
       const prompt = buildPromptWithQuote(basePrompt, quoted);
-      const status = new TaskStatusCard(key, msg.messageId, transport);
-      await status.start();
+      // 单卡：全程 header，正文与状态同一 message
+      const card = new ReplyCard(key, msg.messageId, transport);
+      await card.start();
 
       const useStreaming = cfg?.streamingReply !== false;
-      let stream: StreamingReply | undefined;
-      let streamedAny = false;
-      if (useStreaming && cfg) {
-        stream = new StreamingReply(
-          cfg.appId,
-          cfg.appSecret,
-          cfg.domain === "lark" ? "lark" : "feishu",
-          msg.messageId,
-          async (fallback) => {
-            await transport.replyText(msg.messageId, fallback);
-          },
-        );
-      }
-
       await this.conversations.promptWithImages(
         key,
         prompt,
         imageInputs,
         async (reply) => {
-          if (stream) {
-            stream.ensureFinal(reply || "");
-            await stream.close();
-          } else {
-            await transport.replyText(msg.messageId, reply);
-          }
+          // 最终答案写入同一张卡，不再 replyText 第二条
+          await card.completeWithAnswer(reply || "（无内容）");
         },
-        status,
-        stream
+        card,
+        useStreaming
           ? (delta) => {
-              streamedAny = true;
-              stream!.append(delta);
+              card.append(delta);
             }
           : undefined,
       );

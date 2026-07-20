@@ -14,14 +14,14 @@ import type { FeishuBridgeRuntime } from "./bridge-runtime.js";
 import { CHILD_SESSION_ENV, ensureRoot, loadConfig, readJson, STATE_PATH, writeJson } from "./config.js";
 import { debugLog } from "./debug.js";
 import type { ResumeScope, ResumeSessionPage } from "./cards.js";
-import type { TaskStatusSink } from "./task-status-card.js";
+import type { ReplyCardSink } from "./reply-card.js";
 import type { FeishuState } from "./types.js";
 
 type ActiveRun = {
   session: AgentSession;
   runId?: string;
   stopped: boolean;
-  status?: TaskStatusSink;
+  status?: ReplyCardSink;
 };
 
 export type StopConversationResult =
@@ -76,7 +76,7 @@ export class ConversationManager {
     userText: string,
     images: Array<{ type: "image"; data: string; mimeType: string }>,
     onReply: (text: string) => Promise<void>,
-    status?: TaskStatusSink,
+    status?: ReplyCardSink,
     onDelta?: (delta: string) => void,
   ) {
     const previous = this.previousTurn(key);
@@ -95,10 +95,14 @@ export class ConversationManager {
             if (run.stopped) return;
             const type = event?.type || event?.kind;
             if (type === "message_update" || type === "text_delta" || type === "assistant_text_delta") {
-              const delta = event?.delta ?? event?.text ?? event?.content;
-              if (typeof delta === "string" && delta) onDelta(delta);
+              const ame = event?.assistantMessageEvent;
+              const delta =
+                (typeof event?.delta === "string" && event.delta) ||
+                (typeof ame?.delta === "string" && ame.delta) ||
+                (typeof event?.text === "string" && event.text) ||
+                "";
+              if (delta) onDelta(delta);
             }
-            // 兼容部分 runtime：assistant partial content
             if (type === "message" && event?.message?.role === "assistant" && typeof event?.delta === "string") {
               onDelta(event.delta);
             }
@@ -132,12 +136,19 @@ export class ConversationManager {
       const answer = extractLastAssistantText(session);
       debugLog("feishu.prompt.done", { key, answerLength: answer.length });
       await onReply(answer || "No response.");
+      // onReply（ReplyCard.completeWithAnswer）已切到 done；此处仅兜底
       await status?.finish("done");
     }).catch(async (error) => {
       const message = error instanceof Error ? error.message : String(error);
       debugLog("feishu.prompt.error", { key, error: message });
-      await status?.finish("failed", message);
-      await onReply(`Pi error: ${message}`);
+      // 错误也写进同一张卡；onReply 若已是 completeWithAnswer 会 no-op（status 非 running）
+      if (status && "ensureFinal" in status && typeof (status as any).ensureFinal === "function") {
+        (status as any).ensureFinal(`出错了：${message}`);
+        await status.finish("failed", message);
+      } else {
+        await status?.finish("failed", message);
+        await onReply(`Pi error: ${message}`);
+      }
     });
     this.queues.set(key, next);
     await next;
@@ -188,11 +199,11 @@ export class ConversationManager {
     }
 
     active.stopped = true;
-    await active.status?.stopImmediately("用户已停止任务");
+    await active.status?.stopImmediately("已停止");
     try {
       await active.session.abort();
       debugLog("feishu.prompt.abort", { key });
-      const message = "已停止当前处理。";
+      const message = "已停止";
       await onReply(message);
       return { status: "stopped", message };
     } catch (error) {
