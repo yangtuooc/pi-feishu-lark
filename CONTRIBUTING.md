@@ -70,11 +70,13 @@ BREAKING CHANGE: callers must migrate the env var name.
 4. Release Please creates:
    - git tag `vX.Y.Z`
    - GitHub Release with changelog notes
-5. **Publish** (`publish.yml`) runs on `release: published`:
+5. **Publish** (`publish.yml`) runs automatically when a `v*` tag is pushed
+   (Release Please does this on Release PR merge). It also listens to
+   `release: published` and supports manual `workflow_dispatch`.
    - checks out the tag
    - verifies tag version == `package.json`
    - runs `check` + `test`
-   - `npm publish --access public --provenance`
+   - `npm publish --access public --provenance` (skips if version already on npm)
 
 ### Manual / hotfix publish
 
