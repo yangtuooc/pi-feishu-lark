@@ -126,7 +126,8 @@ export class FeishuMessageHandler {
       const card = new ReplyCard(key, msg.messageId, transport);
       await card.start();
 
-      // 卡片只展示最终用户回复；不流式过程、不展示阶段
+      // 卡片只流式最终用户可见文本（不展示工具/阶段过程）
+      const useStreaming = cfg?.streamingReply !== false;
       await this.conversations.promptWithImages(
         key,
         prompt,
@@ -135,7 +136,7 @@ export class FeishuMessageHandler {
           await card.completeWithAnswer(reply || "（无内容）");
         },
         card,
-        undefined,
+        useStreaming ? (delta) => card.append(delta) : undefined,
       );
       await markFeishuMessage(msg.messageId, "replied");
     } catch (error) {

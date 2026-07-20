@@ -25,10 +25,10 @@ export function buildReplyCard(input: {
   const elements: object[] = [];
 
   if (running) {
-    // 进行中不展示模型过程，仅占位 + 停止
+    // 进行中：只展示最终回复流式正文（无进度/工具过程）+ 停止
     elements.push({
       tag: "div",
-      text: { tag: "lark_md", content: "…" },
+      text: { tag: "lark_md", content: body || "…" },
     });
     elements.push({
       tag: "action",

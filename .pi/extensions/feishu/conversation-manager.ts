@@ -93,18 +93,12 @@ export class ConversationManager {
         try {
           unsub = session.subscribe((event: any) => {
             if (run.stopped) return;
-            const type = event?.type || event?.kind;
-            if (type === "message_update" || type === "text_delta" || type === "assistant_text_delta") {
-              const ame = event?.assistantMessageEvent;
-              const delta =
-                (typeof event?.delta === "string" && event.delta) ||
-                (typeof ame?.delta === "string" && ame.delta) ||
-                (typeof event?.text === "string" && event.text) ||
-                "";
-              if (delta) onDelta(delta);
-            }
-            if (type === "message" && event?.message?.role === "assistant" && typeof event?.delta === "string") {
-              onDelta(event.delta);
+            // Pi SDK: message_update + assistantMessageEvent.text_delta
+            if (event?.type === "message_update") {
+              const ame = event.assistantMessageEvent;
+              if (ame?.type === "text_delta" && typeof ame.delta === "string" && ame.delta) {
+                onDelta(ame.delta);
+              }
             }
           });
         } catch (error) {

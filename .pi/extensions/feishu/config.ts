@@ -38,7 +38,7 @@ export const DEFAULT_CONFIG: Pick<
   cardActionWebhookPort: 3001,
   cardActionWebhookPath: "/webhook/card",
   language: "zh",
-  reactEmoji: "THUMBSUP",
+  reactEmoji: "Get",
   autoStart: true,
   parseInteractiveCards: true,
   includeQuotedMessage: true,

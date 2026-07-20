@@ -1,7 +1,8 @@
 /**
  * 单卡回复运行时：全程保留 header。
- * - running：不展示进度/模型过程，仅「回复中」+ 停止
- * - done：只写入最终用户可见回复
+ * - running：header「回复中」+ 最终回复流式正文 + [停止]
+ * - 不展示进度/工具过程；只流式用户可见最终文本
+ * - done：header「回复」+ 最终全文
  */
 import { randomUUID } from "node:crypto";
 import {
@@ -20,11 +21,9 @@ export {
 
 export type ReplyCardSink = {
   readonly runId: string;
-  /** 忽略过程事件（不再展示阶段） */
   updateFromEvent(event: unknown): void;
   stopImmediately(note?: string): Promise<void>;
   finish(status: Exclude<ReplyCardStatus, "running" | "inactive">, note?: string): Promise<void>;
-  /** 忽略流式过程；最终正文走 ensureFinal / completeWithAnswer */
   append(delta: string): void;
   ensureFinal(text: string): void;
 };
@@ -35,6 +34,7 @@ type ReplyCardTransport = {
 };
 
 const MAX_BODY_CHARS = 12000;
+const STREAM_FLUSH_MS = 500;
 
 export class ReplyCard implements ReplyCardSink {
   readonly runId = randomUUID();
@@ -42,6 +42,9 @@ export class ReplyCard implements ReplyCardSink {
   private status: ReplyCardStatus = "running";
   private body = "";
   private note: string | undefined;
+  private streamDirty = false;
+  private streamTimer: NodeJS.Timeout | undefined;
+  private flushInFlight = false;
   private patchQueue: Promise<void> = Promise.resolve();
   private readonly key: string;
   private readonly replyToMessageId: string;
@@ -65,6 +68,7 @@ export class ReplyCard implements ReplyCardSink {
           key: this.key,
           runId: this.runId,
           status: "running",
+          body: "",
         }),
       );
       debugLog("feishu.reply_card.started", {
@@ -79,19 +83,27 @@ export class ReplyCard implements ReplyCardSink {
     }
   }
 
-  /** 过程事件不展示，避免卡片被工具/阶段刷屏 */
+  /** 不展示工具/阶段过程 */
   updateFromEvent(_event: unknown) {
-    // intentionally no-op
+    // no-op: 过程不进入卡片
   }
 
-  /** 流式过程不写入卡片；只保留最终回复 */
-  append(_delta: string) {
-    // intentionally no-op
+  /** 流式写入最终用户可见文本（仅 assistant text delta） */
+  append(delta: string) {
+    if (this.status !== "running" || !delta) return;
+    this.body += delta;
+    if (this.body.length > MAX_BODY_CHARS) {
+      this.body = `${this.body.slice(0, MAX_BODY_CHARS)}\n…(truncated)`;
+    }
+    this.streamDirty = true;
+    this.scheduleStreamFlush();
   }
 
   ensureFinal(text: string) {
     if (!text) return;
-    this.body = text;
+    if (!this.body.trim() || text.length >= this.body.length) {
+      this.body = text;
+    }
     if (this.body.length > MAX_BODY_CHARS) {
       this.body = `${this.body.slice(0, MAX_BODY_CHARS)}\n…(truncated)`;
     }
@@ -105,10 +117,38 @@ export class ReplyCard implements ReplyCardSink {
     await this.finishFinal(status, note, false);
   }
 
-  /** 正常结束：只展示最终用户回复 */
   async completeWithAnswer(answer: string) {
     this.ensureFinal(answer || "（无内容）");
     await this.finishFinal("done", undefined, false);
+  }
+
+  private scheduleStreamFlush() {
+    if (this.status !== "running") return;
+    if (this.streamTimer) return;
+    this.streamTimer = setTimeout(() => {
+      this.streamTimer = undefined;
+      void this.flushStream();
+    }, STREAM_FLUSH_MS);
+    this.streamTimer.unref?.();
+  }
+
+  private async flushStream() {
+    if (this.status !== "running" || this.flushInFlight || !this.streamDirty) return;
+    this.flushInFlight = true;
+    this.streamDirty = false;
+    try {
+      await this.patch(
+        buildReplyCard({
+          key: this.key,
+          runId: this.runId,
+          status: "running",
+          body: this.body,
+        }),
+      );
+    } finally {
+      this.flushInFlight = false;
+    }
+    if (this.streamDirty) this.scheduleStreamFlush();
   }
 
   private async finishFinal(
@@ -118,6 +158,7 @@ export class ReplyCard implements ReplyCardSink {
   ) {
     if (this.status !== "running") return;
     this.status = status;
+    this.clearStreamTimer();
     this.note = note ?? defaultFinalNote(status);
     await this.patch(
       buildReplyCard({
@@ -146,6 +187,7 @@ export class ReplyCard implements ReplyCardSink {
             messageId,
             final: Boolean(options.final),
             status: this.status,
+            bodyLen: this.body.length,
           });
         } catch (error) {
           debugLog("feishu.reply_card.update_error", {
@@ -170,6 +212,13 @@ export class ReplyCard implements ReplyCardSink {
       debugLog("feishu.reply_card.final_retry_error", {
         error: error instanceof Error ? error.message : String(error),
       });
+    }
+  }
+
+  private clearStreamTimer() {
+    if (this.streamTimer) {
+      clearTimeout(this.streamTimer);
+      this.streamTimer = undefined;
     }
   }
 }
