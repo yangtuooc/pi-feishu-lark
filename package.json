@@ -1,6 +1,6 @@
 {
   "name": "@xjuai/pi-feishu-lark",
-  "version": "0.4.3",
+  "version": "0.4.4",
   "description": "Feishu/Lark bridge for Pi — interactive inbound, streaming, retries (fork of AX1202/pi-feishu-lark)",
   "type": "module",
   "license": "MIT",

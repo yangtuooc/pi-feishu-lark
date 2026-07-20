@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.4](https://github.com/yangtuooc/pi-feishu-lark/compare/v0.4.3...v0.4.4) (2026-07-20)
+
+
+### Features
+
+* configurable smoother reply streaming ([2f0699d](https://github.com/yangtuooc/pi-feishu-lark/commit/2f0699de38dfe65d2ba7d1d65b6f9a6f66f09a15))
+
 ## [0.4.3](https://github.com/yangtuooc/pi-feishu-lark/compare/v0.4.2...v0.4.3) (2026-07-20)
 
 
