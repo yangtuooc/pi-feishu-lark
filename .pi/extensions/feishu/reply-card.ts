@@ -45,8 +45,8 @@ type ReplyCardTransport = {
   updateCard(messageId: string, card: object): Promise<void>;
 };
 
-const DEFAULT_FLUSH_MS = 1200;
-const DEFAULT_MIN_CHARS = 24;
+const DEFAULT_FLUSH_MS = 400;
+const DEFAULT_MIN_CHARS = 1;
 const DEFAULT_MAX_BODY = 12000;
 
 function resolveStreamOptions(override?: ReplyCardStreamOptions): Required<ReplyCardStreamOptions> {
@@ -170,18 +170,10 @@ export class ReplyCard implements ReplyCardSink {
   private scheduleStreamFlush() {
     if (this.status !== "running" || !this.stream.enabled) return;
     if (this.streamTimer) return;
-
-    const pending = this.pendingChars();
-    // 字数不够：等攒够再刷（仍设上限定时器，避免长时间不更新）
-    const waitMs =
-      pending >= this.stream.minChars
-        ? this.stream.flushMs
-        : Math.max(this.stream.flushMs, this.stream.flushMs * 2);
-
     this.streamTimer = setTimeout(() => {
       this.streamTimer = undefined;
       void this.flushStream();
-    }, waitMs);
+    }, this.stream.flushMs);
     this.streamTimer.unref?.();
   }
 

@@ -50,9 +50,9 @@ export const DEFAULT_CONFIG: Pick<
   queueWaitTimeoutMs: 3_600_000,
   sendMaxRetries: 2,
   streamingReply: true,
-  // 偏平滑：拉长刷新间隔 + 要求一定新增字数再 patch，减少整卡重绘闪动
-  streamFlushMs: 1200,
-  streamMinChars: 24,
+  // 默认偏跟手：400ms + 1 字即可 patch；可用 env 调大以减少闪动
+  streamFlushMs: 400,
+  streamMinChars: 1,
   streamMaxBodyChars: 12000,
 };
 

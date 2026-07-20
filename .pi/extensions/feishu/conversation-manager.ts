@@ -22,6 +22,8 @@ type ActiveRun = {
   runId?: string;
   stopped: boolean;
   status?: ReplyCardSink;
+  /** 当前轮流式回调（由 promptWithImages 设置） */
+  onDelta?: (delta: string) => void;
 };
 
 export type StopConversationResult =
@@ -83,29 +85,21 @@ export class ConversationManager {
     const next = previous.then(async () => {
       debugLog("feishu.prompt.start", { key, textLength: userText.length, imageCount: images.length });
       const session = await this.getSession(key);
-      const run: ActiveRun = { session, runId: status?.runId, stopped: false, status };
+      const run: ActiveRun = { session, runId: status?.runId, stopped: false, status, onDelta };
       this.activeRuns.set(key, run);
       this.bridge?.beginFeishuInput(session.sessionId);
       const promptTimeoutMs = loadConfig()?.promptTimeoutMs ?? 3_600_000;
-      // 尽量订阅 token/text 增量以支持流式；API 差异时静默忽略
+      // 流式走 session 级订阅（createSession 里）→ run.onDelta，避免漏事件
       let unsub: (() => void) | undefined;
+      let deltaCount = 0;
+      let deltaChars = 0;
       if (onDelta) {
-        try {
-          unsub = session.subscribe((event: any) => {
-            if (run.stopped) return;
-            // Pi SDK: message_update + assistantMessageEvent.text_delta
-            if (event?.type === "message_update") {
-              const ame = event.assistantMessageEvent;
-              if (ame?.type === "text_delta" && typeof ame.delta === "string" && ame.delta) {
-                onDelta(ame.delta);
-              }
-            }
-          });
-        } catch (error) {
-          debugLog("feishu.prompt.subscribe_failed", {
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
+        const userOnDelta = onDelta;
+        run.onDelta = (delta: string) => {
+          deltaCount += 1;
+          deltaChars += delta.length;
+          userOnDelta(delta);
+        };
       }
       try {
         try {
@@ -123,12 +117,18 @@ export class ConversationManager {
         }
       } finally {
         try { unsub?.(); } catch {}
+        run.onDelta = undefined;
         if (this.activeRuns.get(key) === run) this.activeRuns.delete(key);
         this.bridge?.endFeishuInput(session.sessionId);
       }
       if (run.stopped) return;
       const answer = extractLastAssistantText(session);
-      debugLog("feishu.prompt.done", { key, answerLength: answer.length });
+      debugLog("feishu.prompt.done", {
+        key,
+        answerLength: answer.length,
+        deltaCount,
+        deltaChars,
+      });
       await onReply(answer || "No response.");
       // onReply（ReplyCard.completeWithAnswer）已切到 done；此处仅兜底
       await status?.finish("done");
@@ -460,8 +460,18 @@ export class ConversationManager {
 
     await session.bindExtensions({});
     this.bridge?.attachSession(key, session.sessionId);
-    session.subscribe((event) => {
-      this.activeRuns.get(key)?.status?.updateFromEvent(event);
+    // 会话级长期订阅：保证 text_delta 在 prompt 期间一定能收到
+    session.subscribe((event: any) => {
+      const run = this.activeRuns.get(key);
+      run?.status?.updateFromEvent(event);
+      const delta = extractAssistantTextDelta(event);
+      if (delta && run && !run.stopped) {
+        // 优先 onDelta（与 prompt 绑定）；否则直接 append 到 status 卡
+        if (run.onDelta) run.onDelta(delta);
+        else if (run.status && typeof (run.status as any).append === "function") {
+          (run.status as any).append(delta);
+        }
+      }
       if (event.type === "message_end") {
         this.bridge?.handleMessageEnd(session.sessionId, key, event.message);
       }
@@ -528,6 +538,26 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMes
   } finally {
     if (timer) clearTimeout(timer);
   }
+}
+
+
+/** 从 Pi AgentSession 事件中提取 assistant 最终可见文本增量 */
+function extractAssistantTextDelta(event: any): string | undefined {
+  if (!event || typeof event !== "object") return undefined;
+  // 标准：message_update + assistantMessageEvent.text_delta
+  if (event.type === "message_update") {
+    const ame = event.assistantMessageEvent;
+    if (ame?.type === "text_delta" && typeof ame.delta === "string" && ame.delta) {
+      return ame.delta;
+    }
+    // 兼容：delta 挂在 event 上
+    if (typeof event.delta === "string" && event.delta) return event.delta;
+  }
+  // 兼容：顶层 text_delta
+  if (event.type === "text_delta" && typeof event.delta === "string" && event.delta) {
+    return event.delta;
+  }
+  return undefined;
 }
 
 function extractLastAssistantText(session: AgentSession): string {

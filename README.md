@@ -122,8 +122,8 @@ pi install npm:@xjuai/pi-feishu-lark -a
 | `FEISHU_QUEUE_WAIT_TIMEOUT_MS` | `3600000` | Wait timeout for previous turn |
 | `FEISHU_SEND_MAX_RETRIES` | `2` | Outbound API retries (excluding first try) |
 | `FEISHU_STREAMING_REPLY` | `true` | Stream final reply text on the same card |
-| `FEISHU_STREAM_FLUSH_MS` | `1200` | Min interval between stream card patches (ms) |
-| `FEISHU_STREAM_MIN_CHARS` | `24` | Min new chars before a stream patch |
+| `FEISHU_STREAM_FLUSH_MS` | `400` | Min interval between stream card patches (ms) |
+| `FEISHU_STREAM_MIN_CHARS` | `1` | Min new chars before a stream patch |
 | `FEISHU_STREAM_MAX_BODY_CHARS` | `12000` | Max reply body chars on the card |
 | `FEISHU_AUTO_START` | `true` | Auto-connect when Pi starts |
 | `FEISHU_LANGUAGE` | `zh` | `zh` / `en` |
