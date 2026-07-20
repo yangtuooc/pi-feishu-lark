@@ -8,6 +8,61 @@ Feishu / Lark bridge extension for the [Pi](https://github.com/earendil-works/pi
 
 A refactor-style fork of [AX1202/pi-feishu-lark](https://github.com/AX1202/pi-feishu-lark) (MIT), hardened for Docker daemon mode and production alert workflows.
 
+## Architecture
+
+```text
+┌──────────────────────────────────────────────────────────────────────────┐
+│  Runtime (Pi extension / Docker worker / optional daemon)                │
+│  gateway-lock · config · health · debug log                              │
+└───────────────────────────────┬──────────────────────────────────────────┘
+                                │
+        ┌───────────────────────▼───────────────────────┐
+        │  Feishu Transport                             │
+        │  WS long-connection · SDK · card actions      │
+        │  send/reply (text · post · interactive)       │
+        │  getMessage (quoted parent/root) · retries    │
+        └───────────────────────┬───────────────────────┘
+                                │ InboundEvent
+        ┌───────────────────────▼───────────────────────┐
+        │  Inbound Pipeline                             │
+        │  dedupe → group policy → parseMessageInput    │
+        │  extractors: text / post / interactive / file │
+        │  quote expand → commands (/new /model /…)     │
+        └───────────────────────┬───────────────────────┘
+                                │ AgentRequest
+        ┌───────────────────────▼───────────────────────┐
+        │  Session Orchestrator (ConversationManager)   │
+        │  conversation key → Pi session                │
+        │  per-key queue · model/workspace · stop       │
+        │  configurable prompt / queue timeouts         │
+        └───────────────────────┬───────────────────────┘
+                                │ stream events + final
+        ┌───────────────────────▼───────────────────────┐
+        │  Pi Session Port                              │
+        │  createAgentSession · prompt · abort          │
+        │  SessionManager (on-disk sessions)            │
+        └───────────────────────┬───────────────────────┘
+                                │ deltas + final text
+        ┌───────────────────────▼───────────────────────┐
+        │  Outbound Presenter                           │
+        │  CardKit streaming (fallback → plain reply)   │
+        │  rich-text mode · chunking · retries          │
+        │  task-status card · bridge (scheduled jobs)   │
+        └───────────────────────────────────────────────┘
+```
+
+**Message flow (happy path):**
+
+```text
+Feishu user / alert card
+    → Transport (WS)
+    → dedupe + parse (interactive / quote)
+    → ConversationManager.prompt
+    → Pi agent turn
+    → StreamingReply / replyText
+    → Feishu chat
+```
+
 ## Changes vs upstream
 
 - **Inbound interactive card parsing** — alert-bot cards become readable text for the agent

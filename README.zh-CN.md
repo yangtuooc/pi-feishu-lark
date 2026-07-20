@@ -8,6 +8,61 @@
 
 基于 [AX1202/pi-feishu-lark](https://github.com/AX1202/pi-feishu-lark) 的重构式 fork（MIT），面向 Docker 守护与生产告警场景增强。
 
+## 架构
+
+```text
+┌──────────────────────────────────────────────────────────────────────────┐
+│  Runtime（Pi 扩展 / Docker worker / 可选 daemon）                          │
+│  gateway-lock · 配置 · 健康状态 · 调试日志                                 │
+└───────────────────────────────┬──────────────────────────────────────────┘
+                                │
+        ┌───────────────────────▼───────────────────────┐
+        │  Feishu Transport（传输层）                     │
+        │  WS 长连接 · SDK · 卡片回调                     │
+        │  发送/回复（text · post · interactive）         │
+        │  getMessage（引用父/根消息）· 出站重试          │
+        └───────────────────────┬───────────────────────┘
+                                │ InboundEvent
+        ┌───────────────────────▼───────────────────────┐
+        │  Inbound Pipeline（入站流水线）                 │
+        │  去重 → 群策略 → parseMessageInput              │
+        │  解析器：text / post / interactive / file       │
+        │  引用展开 → 命令（/new /model /…）              │
+        └───────────────────────┬───────────────────────┘
+                                │ AgentRequest
+        ┌───────────────────────▼───────────────────────┐
+        │  Session Orchestrator（ConversationManager）  │
+        │  会话键 → Pi session                           │
+        │  按 key 串行队列 · 模型/工作区 · 停止           │
+        │  可配置 prompt / 队列超时                       │
+        └───────────────────────┬───────────────────────┘
+                                │ 流式事件 + 最终回复
+        ┌───────────────────────▼───────────────────────┐
+        │  Pi Session Port                               │
+        │  createAgentSession · prompt · abort           │
+        │  SessionManager（落盘 session）                 │
+        └───────────────────────┬───────────────────────┘
+                                │ delta + 最终文本
+        ┌───────────────────────▼───────────────────────┐
+        │  Outbound Presenter（出站呈现）                 │
+        │  CardKit 流式（失败回落普通回复）               │
+        │  rich-text 模式 · 分片 · 重试                   │
+        │  任务状态卡 · bridge（定时任务回投）            │
+        └───────────────────────────────────────────────┘
+```
+
+**主路径消息流：**
+
+```text
+飞书用户 / 告警卡片
+    → Transport（WS）
+    → 去重 + 解析（interactive / 引用）
+    → ConversationManager.prompt
+    → Pi agent 一轮
+    → StreamingReply / replyText
+    → 飞书会话
+```
+
 ## 相对上游的改动
 
 - **入站 interactive 卡片解析**：告警机器人卡片可转为可读文本进入 agent
