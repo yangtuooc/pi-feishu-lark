@@ -30,6 +30,9 @@ export const DEFAULT_CONFIG: Pick<
   | "queueWaitTimeoutMs"
   | "sendMaxRetries"
   | "streamingReply"
+  | "streamFlushMs"
+  | "streamMinChars"
+  | "streamMaxBodyChars"
 > = {
   domain: "feishu",
   groupPolicy: "open",
@@ -47,6 +50,10 @@ export const DEFAULT_CONFIG: Pick<
   queueWaitTimeoutMs: 3_600_000,
   sendMaxRetries: 2,
   streamingReply: true,
+  // 偏平滑：拉长刷新间隔 + 要求一定新增字数再 patch，减少整卡重绘闪动
+  streamFlushMs: 1200,
+  streamMinChars: 24,
+  streamMaxBodyChars: 12000,
 };
 
 export function ensureRoot() {
@@ -100,6 +107,9 @@ function applyRuntimeDefaults(cfg: FeishuConfig): FeishuConfig {
     queueWaitTimeoutMs: cfg.queueWaitTimeoutMs ?? DEFAULT_CONFIG.queueWaitTimeoutMs,
     sendMaxRetries: cfg.sendMaxRetries ?? DEFAULT_CONFIG.sendMaxRetries,
     streamingReply: cfg.streamingReply ?? DEFAULT_CONFIG.streamingReply,
+    streamFlushMs: cfg.streamFlushMs ?? DEFAULT_CONFIG.streamFlushMs,
+    streamMinChars: cfg.streamMinChars ?? DEFAULT_CONFIG.streamMinChars,
+    streamMaxBodyChars: cfg.streamMaxBodyChars ?? DEFAULT_CONFIG.streamMaxBodyChars,
   };
 }
 
@@ -126,6 +136,9 @@ export function loadConfig(): FeishuConfig | undefined {
       queueWaitTimeoutMs: parsePositiveInt(process.env.FEISHU_QUEUE_WAIT_TIMEOUT_MS, DEFAULT_CONFIG.queueWaitTimeoutMs!),
       sendMaxRetries: parsePositiveInt(process.env.FEISHU_SEND_MAX_RETRIES, DEFAULT_CONFIG.sendMaxRetries!),
       streamingReply: parseBool(process.env.FEISHU_STREAMING_REPLY, DEFAULT_CONFIG.streamingReply!),
+      streamFlushMs: parsePositiveInt(process.env.FEISHU_STREAM_FLUSH_MS, DEFAULT_CONFIG.streamFlushMs!),
+      streamMinChars: parsePositiveInt(process.env.FEISHU_STREAM_MIN_CHARS, DEFAULT_CONFIG.streamMinChars!),
+      streamMaxBodyChars: parsePositiveInt(process.env.FEISHU_STREAM_MAX_BODY_CHARS, DEFAULT_CONFIG.streamMaxBodyChars!),
     });
   }
   if (!existsSync(CONFIG_PATH)) return undefined;
@@ -150,6 +163,9 @@ export function loadConfig(): FeishuConfig | undefined {
     queueWaitTimeoutMs: cfg.queueWaitTimeoutMs,
     sendMaxRetries: cfg.sendMaxRetries,
     streamingReply: cfg.streamingReply,
+    streamFlushMs: cfg.streamFlushMs,
+    streamMinChars: cfg.streamMinChars,
+    streamMaxBodyChars: cfg.streamMaxBodyChars,
   });
 }
 

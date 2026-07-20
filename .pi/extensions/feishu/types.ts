@@ -26,8 +26,23 @@ export type FeishuConfig = {
   queueWaitTimeoutMs?: number;
   /** 出站 API 最大重试次数（不含首次） */
   sendMaxRetries?: number;
-  /** 是否启用 CardKit 流式回复（默认 true） */
+  /**
+   * 是否在同一张回复卡上边生成边刷新最终可见正文（默认 true）。
+   * false：整轮结束后一次性写入全文。
+   */
   streamingReply?: boolean;
+  /**
+   * 流式 patch 最小间隔（毫秒，默认 1200）。
+   * 过小易块状闪动；过大则更新偏钝。
+   */
+  streamFlushMs?: number;
+  /**
+   * 触发一次流式 patch 所需最少新增字符数（默认 24）。
+   * 与 streamFlushMs 一起做「时间 + 字符」双阈值，减轻整卡重绘闪动。
+   */
+  streamMinChars?: number;
+  /** 流式/最终正文最大字符数（默认 12000） */
+  streamMaxBodyChars?: number;
 };
 
 export type ModelSelection = {

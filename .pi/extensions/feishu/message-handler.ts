@@ -122,12 +122,16 @@ export class FeishuMessageHandler {
 
       const basePrompt = buildPrompt(msg, text, fileSections, imageInputs, skippedImageCount, modelSupportsImage, downloadErrors);
       const prompt = buildPromptWithQuote(basePrompt, quoted);
-      // 单卡：全程 header，正文与状态同一 message
-      const card = new ReplyCard(key, msg.messageId, transport);
+      // 单卡：全程 header；流式参数来自 config/env
+      const useStreaming = cfg?.streamingReply !== false;
+      const card = new ReplyCard(key, msg.messageId, transport, {
+        enabled: useStreaming,
+        flushMs: cfg?.streamFlushMs,
+        minChars: cfg?.streamMinChars,
+        maxBodyChars: cfg?.streamMaxBodyChars,
+      });
       await card.start();
 
-      // 卡片只流式最终用户可见文本（不展示工具/阶段过程）
-      const useStreaming = cfg?.streamingReply !== false;
       await this.conversations.promptWithImages(
         key,
         prompt,
