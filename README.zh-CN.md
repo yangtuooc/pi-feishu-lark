@@ -73,6 +73,18 @@
 - **保留上游能力**：`/workspace`、resume 卡片、gateway lock、daemon、model 切换
 - **命令**：新增 `/status`、`/commands`
 
+## 分支、版本与发布
+
+| 项 | 策略 |
+|----|------|
+| 默认分支 | `main`（始终可发布） |
+| 功能开发 | 短生命周期 `feat/*` / `fix/*` / `docs/*` PR 合入 `main` |
+| 版本 | [SemVer](https://semver.org/) + [Conventional Commits](https://www.conventionalcommits.org/) |
+| Release | [Release Please](https://github.com/googleapis/release-please) 自动开 Release PR；合并后打 `vX.Y.Z` 并创建 GitHub Release |
+| npm | `publish.yml` 在 `release: published` 时执行 `npm publish --access public --provenance` |
+
+完整说明见 [CONTRIBUTING.md](./CONTRIBUTING.md)。
+
 ## 安装
 
 ```bash

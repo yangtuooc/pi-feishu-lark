@@ -1,0 +1,28 @@
+name: Release Please
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: release-please
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    name: Release Please
+    runs-on: ubuntu-latest
+    steps:
+      - name: Release Please
+        uses: googleapis/release-please-action@v5
+        with:
+          # 基于 Conventional Commits 打开/更新 Release PR；
+          # 合并后打 vX.Y.Z tag 并创建 GitHub Release。
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          # token 默认 GITHUB_TOKEN；若 PR 无法触发后续 workflow，可换成 PAT。
+          token: ${{ secrets.GITHUB_TOKEN }}

@@ -1,7 +1,7 @@
 {
   "name": "@xjuai/pi-feishu-lark",
   "version": "0.4.0",
-  "description": "Feishu/Lark bridge for Pi \u2014 refactor-style fork of AX1202/pi-feishu-lark with interactive inbound, retries, and streaming",
+  "description": "Feishu/Lark bridge for Pi — interactive inbound, streaming, retries (fork of AX1202/pi-feishu-lark)",
   "type": "module",
   "license": "MIT",
   "keywords": [
@@ -32,5 +32,28 @@
   "scripts": {
     "check": "tsc --noEmit",
     "test": "node --experimental-strip-types --import ./test/register.mjs --test test/*.test.ts"
+  },
+  "homepage": "https://github.com/yangtuooc/pi-feishu-lark#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yangtuooc/pi-feishu-lark.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yangtuooc/pi-feishu-lark/issues"
+  },
+  "author": "yangtuooc",
+  "files": [
+    ".pi",
+    "README.md",
+    "README.zh-CN.md",
+    "LICENSE",
+    "CHANGELOG.md"
+  ],
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

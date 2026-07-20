@@ -73,6 +73,18 @@ Feishu user / alert card
 - **Upstream features kept** — `/workspace`, resume cards, gateway lock, daemon, model switch
 - **Commands** — added `/status`, `/commands`
 
+## Branching, versioning & releases
+
+| Item | Policy |
+|------|--------|
+| Default branch | `main` (always releasable) |
+| Feature work | short-lived `feat/*` / `fix/*` / `docs/*` PRs into `main` |
+| Versioning | [SemVer](https://semver.org/) via [Conventional Commits](https://www.conventionalcommits.org/) |
+| Release automation | [Release Please](https://github.com/googleapis/release-please) opens a Release PR; merge → `vX.Y.Z` tag + GitHub Release |
+| npm publish | `publish.yml` on `release: published` (`npm publish --access public --provenance`) |
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for commit types and the full flow.
+
 ## Install
 
 ```bash
