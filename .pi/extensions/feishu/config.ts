@@ -1,0 +1,177 @@
+import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync, rmSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join } from "node:path";
+import type { CardActionMode, Domain, FeishuConfig, GroupPolicy } from "./types.js";
+
+export const ROOT_DIR = join(homedir(), ".pi", "agent", "feishu");
+export const CONFIG_PATH = join(ROOT_DIR, "config.json");
+export const STATE_PATH = join(ROOT_DIR, "state.json");
+export const DEBUG_LOG_PATH = join(ROOT_DIR, "debug.log");
+export const DAEMON_LOG_PATH = join(ROOT_DIR, "daemon.log");
+export const DEDUPE_PATH = join(ROOT_DIR, "dedupe.json");
+export const BRIDGE_PATH = join(ROOT_DIR, "bridge.json");
+export const CHILD_SESSION_ENV = "PI_FEISHU_CHILD_SESSION";
+
+export const DEFAULT_CONFIG: Pick<
+  FeishuConfig,
+  | "domain"
+  | "groupPolicy"
+  | "cardActionMode"
+  | "cardActionWebhookHost"
+  | "cardActionWebhookPort"
+  | "cardActionWebhookPath"
+  | "language"
+  | "reactEmoji"
+  | "autoStart"
+  | "parseInteractiveCards"
+  | "includeQuotedMessage"
+  | "quotedMessageMaxChars"
+  | "promptTimeoutMs"
+  | "queueWaitTimeoutMs"
+  | "sendMaxRetries"
+  | "streamingReply"
+> = {
+  domain: "feishu",
+  groupPolicy: "open",
+  cardActionMode: "webhook",
+  cardActionWebhookHost: "0.0.0.0",
+  cardActionWebhookPort: 3001,
+  cardActionWebhookPath: "/webhook/card",
+  language: "zh",
+  reactEmoji: "THUMBSUP",
+  autoStart: true,
+  parseInteractiveCards: true,
+  includeQuotedMessage: true,
+  quotedMessageMaxChars: 8000,
+  promptTimeoutMs: 3_600_000,
+  queueWaitTimeoutMs: 3_600_000,
+  sendMaxRetries: 2,
+  streamingReply: true,
+};
+
+export function ensureRoot() {
+  mkdirSync(ROOT_DIR, { recursive: true });
+}
+
+export function readJson<T>(path: string, fallback: T): T {
+  if (!existsSync(path)) return fallback;
+  try {
+    return JSON.parse(readFileSync(path, "utf8")) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+export function writeJson(path: string, value: unknown) {
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, `${JSON.stringify(value, null, 2)}\n`, "utf8");
+  try {
+    chmodSync(path, 0o600);
+  } catch {}
+}
+
+export function removePath(path: string) {
+  rmSync(path, { recursive: true, force: true });
+}
+
+function parseBool(value: unknown, fallback: boolean): boolean {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const v = value.trim().toLowerCase();
+    if (["1", "true", "yes", "on"].includes(v)) return true;
+    if (["0", "false", "no", "off"].includes(v)) return false;
+  }
+  return fallback;
+}
+
+function parsePositiveInt(value: unknown, fallback: number): number {
+  const n = typeof value === "number" ? value : typeof value === "string" ? Number.parseInt(value, 10) : NaN;
+  if (!Number.isFinite(n) || n <= 0) return fallback;
+  return Math.floor(n);
+}
+
+function applyRuntimeDefaults(cfg: FeishuConfig): FeishuConfig {
+  return {
+    ...cfg,
+    parseInteractiveCards: cfg.parseInteractiveCards ?? DEFAULT_CONFIG.parseInteractiveCards,
+    includeQuotedMessage: cfg.includeQuotedMessage ?? DEFAULT_CONFIG.includeQuotedMessage,
+    quotedMessageMaxChars: cfg.quotedMessageMaxChars ?? DEFAULT_CONFIG.quotedMessageMaxChars,
+    promptTimeoutMs: cfg.promptTimeoutMs ?? DEFAULT_CONFIG.promptTimeoutMs,
+    queueWaitTimeoutMs: cfg.queueWaitTimeoutMs ?? DEFAULT_CONFIG.queueWaitTimeoutMs,
+    sendMaxRetries: cfg.sendMaxRetries ?? DEFAULT_CONFIG.sendMaxRetries,
+    streamingReply: cfg.streamingReply ?? DEFAULT_CONFIG.streamingReply,
+  };
+}
+
+export function loadConfig(): FeishuConfig | undefined {
+  const envAppId = process.env.FEISHU_APP_ID?.trim();
+  const envSecret = process.env.FEISHU_APP_SECRET?.trim();
+  if (envAppId && envSecret) {
+    return applyRuntimeDefaults({
+      appId: envAppId,
+      appSecret: envSecret,
+      domain: (process.env.FEISHU_DOMAIN as Domain) || DEFAULT_CONFIG.domain,
+      groupPolicy: (process.env.FEISHU_GROUP_POLICY as GroupPolicy) || DEFAULT_CONFIG.groupPolicy,
+      cardActionMode: parseCardActionMode(process.env.FEISHU_CARD_ACTION_MODE) || DEFAULT_CONFIG.cardActionMode,
+      cardActionWebhookHost: process.env.FEISHU_CARD_ACTION_WEBHOOK_HOST?.trim() || DEFAULT_CONFIG.cardActionWebhookHost,
+      cardActionWebhookPort: parsePort(process.env.FEISHU_CARD_ACTION_WEBHOOK_PORT) ?? DEFAULT_CONFIG.cardActionWebhookPort,
+      cardActionWebhookPath: normalizeWebhookPath(process.env.FEISHU_CARD_ACTION_WEBHOOK_PATH) || DEFAULT_CONFIG.cardActionWebhookPath,
+      language: (process.env.FEISHU_LANGUAGE as "zh" | "en") || DEFAULT_CONFIG.language,
+      reactEmoji: process.env.FEISHU_REACT_EMOJI || DEFAULT_CONFIG.reactEmoji,
+      autoStart: process.env.FEISHU_AUTO_START ? process.env.FEISHU_AUTO_START !== "0" : DEFAULT_CONFIG.autoStart,
+      parseInteractiveCards: parseBool(process.env.FEISHU_PARSE_INTERACTIVE_CARDS, DEFAULT_CONFIG.parseInteractiveCards!),
+      includeQuotedMessage: parseBool(process.env.FEISHU_INCLUDE_QUOTED_MESSAGE, DEFAULT_CONFIG.includeQuotedMessage!),
+      quotedMessageMaxChars: parsePositiveInt(process.env.FEISHU_QUOTED_MESSAGE_MAX_CHARS, DEFAULT_CONFIG.quotedMessageMaxChars!),
+      promptTimeoutMs: parsePositiveInt(process.env.FEISHU_PROMPT_TIMEOUT_MS, DEFAULT_CONFIG.promptTimeoutMs!),
+      queueWaitTimeoutMs: parsePositiveInt(process.env.FEISHU_QUEUE_WAIT_TIMEOUT_MS, DEFAULT_CONFIG.queueWaitTimeoutMs!),
+      sendMaxRetries: parsePositiveInt(process.env.FEISHU_SEND_MAX_RETRIES, DEFAULT_CONFIG.sendMaxRetries!),
+      streamingReply: parseBool(process.env.FEISHU_STREAMING_REPLY, DEFAULT_CONFIG.streamingReply!),
+    });
+  }
+  if (!existsSync(CONFIG_PATH)) return undefined;
+  const cfg = readJson<Partial<FeishuConfig>>(CONFIG_PATH, {});
+  if (!cfg.appId || !cfg.appSecret) return undefined;
+  return applyRuntimeDefaults({
+    appId: cfg.appId,
+    appSecret: cfg.appSecret,
+    domain: cfg.domain || DEFAULT_CONFIG.domain,
+    groupPolicy: cfg.groupPolicy || DEFAULT_CONFIG.groupPolicy,
+    cardActionMode: parseCardActionMode(cfg.cardActionMode) || DEFAULT_CONFIG.cardActionMode,
+    cardActionWebhookHost: cfg.cardActionWebhookHost || DEFAULT_CONFIG.cardActionWebhookHost,
+    cardActionWebhookPort: typeof cfg.cardActionWebhookPort === "number" ? cfg.cardActionWebhookPort : DEFAULT_CONFIG.cardActionWebhookPort,
+    cardActionWebhookPath: normalizeWebhookPath(cfg.cardActionWebhookPath) || DEFAULT_CONFIG.cardActionWebhookPath,
+    language: cfg.language || DEFAULT_CONFIG.language,
+    reactEmoji: cfg.reactEmoji || DEFAULT_CONFIG.reactEmoji,
+    autoStart: cfg.autoStart ?? DEFAULT_CONFIG.autoStart,
+    parseInteractiveCards: cfg.parseInteractiveCards,
+    includeQuotedMessage: cfg.includeQuotedMessage,
+    quotedMessageMaxChars: cfg.quotedMessageMaxChars,
+    promptTimeoutMs: cfg.promptTimeoutMs,
+    queueWaitTimeoutMs: cfg.queueWaitTimeoutMs,
+    sendMaxRetries: cfg.sendMaxRetries,
+    streamingReply: cfg.streamingReply,
+  });
+}
+
+function parseCardActionMode(value: unknown): CardActionMode | undefined {
+  if (value !== "webhook" && value !== "ws") return undefined;
+  return value;
+}
+
+function parsePort(value: string | undefined) {
+  if (!value) return undefined;
+  const port = Number.parseInt(value, 10);
+  if (!Number.isFinite(port) || port <= 0 || port > 65535) return undefined;
+  return port;
+}
+
+function normalizeWebhookPath(value: string | undefined) {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  return trimmed.startsWith("/") ? trimmed : `/${trimmed}`;
+}
+
+export function mask(s: string) {
+  if (s.length <= 8) return "****";
+  return `${s.slice(0, 4)}****${s.slice(-4)}`;
+}
