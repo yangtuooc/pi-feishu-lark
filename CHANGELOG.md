@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.3](https://github.com/yangtuooc/pi-feishu-lark/compare/v0.4.2...v0.4.3) (2026-07-20)
+
+
+### Bug Fixes
+
+* use Get reaction and stream final reply text ([38fddd4](https://github.com/yangtuooc/pi-feishu-lark/commit/38fddd4237ab4b2a8a6f63a4db36dcc780db1a49))
+
 ## [0.4.2](https://github.com/yangtuooc/pi-feishu-lark/compare/v0.4.1...v0.4.2) (2026-07-20)
 
 
