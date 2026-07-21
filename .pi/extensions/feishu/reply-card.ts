@@ -200,19 +200,8 @@ export class ReplyCard implements ReplyCardSink {
     this.note = note ?? defaultFinalNote(status);
 
     if (this.cardkit) {
-      await this.cardkit.close(this.body);
-      if (status === "stopped" || status === "failed") {
-        await this.transport.replyCard(
-          this.replyToMessageId,
-          buildReplyCard({
-            key: this.key,
-            runId: this.runId,
-            status,
-            note: this.note,
-            body: this.body,
-          }),
-        );
-      }
+      // 同一张 CardKit 卡上关闭流式并更新 header（回复/已停止/出错了）
+      await this.cardkit.close(this.body, status === "failed" ? "failed" : status === "stopped" ? "stopped" : "done");
       return;
     }
 

@@ -184,8 +184,13 @@ export class CardKitStream {
     }
   }
 
-  /** 结束流式：最终内容 + 关 streaming_mode；失败则 fallback 普通回复 */
-  async close(finalText?: string): Promise<void> {
+  /**
+   * 结束流式：
+   * 1) 推送最终正文
+   * 2) 关闭 streaming_mode
+   * 3) 全量更新卡片（header 改为「回复」/绿，避免一直停在「回复中」）
+   */
+  async close(finalText?: string, finalStatus: "done" | "stopped" | "failed" = "done"): Promise<void> {
     if (this.closed) return;
     this.closed = true;
     if (finalText) this.ensureFinal(finalText);
@@ -208,7 +213,9 @@ export class CardKitStream {
       // 给客户端一点时间把剩余字符打完
       await sleep(Math.max(200, this.printFrequencyMs * 4));
       const t = await this.getToken();
-      await fetch(`${this.baseUrl()}/open-apis/cardkit/v1/cards/${this.cardId}/settings`, {
+
+      // 先关 streaming_mode
+      const settingsRes = await fetch(`${this.baseUrl()}/open-apis/cardkit/v1/cards/${this.cardId}/settings`, {
         method: "PATCH",
         headers: { Authorization: `Bearer ${t}`, "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -217,16 +224,71 @@ export class CardKitStream {
               streaming_mode: false,
               summary: { content: (this.fullText.slice(0, 50) || "Pi").replace(/\s+/g, " ") },
             },
-            header: {
-              template: "green",
-              title: { tag: "plain_text", content: "回复" },
-            },
           }),
           sequence: ++this.sequence,
           uuid: `c_${this.cardId}_${this.sequence}`,
         }),
       });
-      debugLog("feishu.cardkit.closed", { cardId: this.cardId, length: this.fullText.length });
+      if (!settingsRes.ok) {
+        debugLog("feishu.cardkit.settings_error", {
+          status: settingsRes.status,
+          body: (await settingsRes.text()).slice(0, 300),
+        });
+      }
+
+      // 再全量更新卡片：header 从「回复中」改为最终状态
+      const headerTitle =
+        finalStatus === "done" ? "回复" : finalStatus === "stopped" ? "已停止" : "出错了";
+      const headerTemplate =
+        finalStatus === "done" ? "green" : finalStatus === "stopped" ? "grey" : "red";
+      const finalCard = {
+        schema: "2.0",
+        config: {
+          streaming_mode: false,
+          wide_screen_mode: true,
+          update_multi: true,
+        },
+        header: {
+          template: headerTemplate,
+          title: { tag: "plain_text", content: headerTitle },
+        },
+        body: {
+          elements: [
+            {
+              tag: "markdown",
+              content: this.fullText || " ",
+              element_id: "content",
+            },
+          ],
+        },
+      };
+      const updateRes = await fetch(`${this.baseUrl()}/open-apis/cardkit/v1/cards/${this.cardId}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${t}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          card: {
+            type: "card_json",
+            data: JSON.stringify(finalCard),
+          },
+          sequence: ++this.sequence,
+          uuid: `u_${this.cardId}_${this.sequence}`,
+        }),
+      });
+      const updateJson = (await updateRes.json().catch(() => ({}))) as CardKitResponse;
+      if (!updateRes.ok || (updateJson.code != null && updateJson.code !== 0)) {
+        debugLog("feishu.cardkit.full_update_error", {
+          status: updateRes.status,
+          code: updateJson.code,
+          msg: updateJson.msg,
+        });
+      }
+
+      debugLog("feishu.cardkit.closed", {
+        cardId: this.cardId,
+        length: this.fullText.length,
+        finalStatus,
+        headerTitle,
+      });
     } catch (e) {
       debugLog("feishu.cardkit.close_error", {
         error: e instanceof Error ? e.message : String(e),
