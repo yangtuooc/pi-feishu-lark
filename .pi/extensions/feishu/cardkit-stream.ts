@@ -2,7 +2,9 @@
  * 飞书 CardKit 真正的流式卡片：
  * streaming_mode + print_frequency_ms/print_step 由客户端逐字打印。
  * 我们侧只需定期 PUT 完整 markdown 内容。
+ * running 卡必须带「停止」按钮（与 card-builder 契约一致）。
  */
+import { buildCardKitCardJson } from "./card-builder.js";
 import { debugLog } from "./debug.js";
 import { withRetry } from "./retry.js";
 
@@ -15,6 +17,10 @@ export type CardKitStreamOptions = {
   printStep?: number;
   /** 服务端把 fullText 推到 CardKit 的间隔 ms（默认 120） */
   pushIntervalMs?: number;
+  /** 会话 key，用于停止按钮回调 */
+  conversationKey?: string;
+  /** 本轮 runId，用于停止按钮回调 */
+  runId?: string;
 };
 
 export class CardKitStream {
@@ -31,6 +37,8 @@ export class CardKitStream {
   private readonly printFrequencyMs: number;
   private readonly printStep: number;
   private readonly pushIntervalMs: number;
+  private readonly conversationKey?: string;
+  private readonly runId?: string;
 
   constructor(
     private readonly appId: string,
@@ -43,6 +51,8 @@ export class CardKitStream {
     this.printFrequencyMs = Math.max(20, options?.printFrequencyMs ?? 50);
     this.printStep = Math.max(1, options?.printStep ?? 1);
     this.pushIntervalMs = Math.max(50, options?.pushIntervalMs ?? 120);
+    this.conversationKey = options?.conversationKey;
+    this.runId = options?.runId;
   }
 
   private baseUrl() {
@@ -67,24 +77,16 @@ export class CardKitStream {
     if (this.cardId || this.failed) return;
     await withRetry(async () => {
       const t = await this.getToken();
-      const card = {
-        schema: "2.0",
-        config: {
-          streaming_mode: true,
-          streaming_config: {
-            print_frequency_ms: { default: this.printFrequencyMs },
-            print_step: { default: this.printStep },
-          },
-          wide_screen_mode: true,
-        },
-        header: {
-          template: "blue",
-          title: { tag: "plain_text", content: "回复中" },
-        },
-        body: {
-          elements: [{ tag: "markdown", content: "", element_id: "content" }],
-        },
-      };
+      // 必须带停止按钮；禁止只建 markdown 导致无法中止
+      const card = buildCardKitCardJson({
+        status: "running",
+        body: "",
+        key: this.conversationKey,
+        runId: this.runId,
+        streaming: true,
+        printFrequencyMs: this.printFrequencyMs,
+        printStep: this.printStep,
+      });
 
       const cr = await fetch(`${this.baseUrl()}/open-apis/cardkit/v1/cards`, {
         method: "POST",
@@ -236,32 +238,14 @@ export class CardKitStream {
         });
       }
 
-      // 再全量更新卡片：header 从「回复中」改为最终状态
-      const headerTitle =
-        finalStatus === "done" ? "回复" : finalStatus === "stopped" ? "已停止" : "出错了";
-      const headerTemplate =
-        finalStatus === "done" ? "green" : finalStatus === "stopped" ? "grey" : "red";
-      const finalCard = {
-        schema: "2.0",
-        config: {
-          streaming_mode: false,
-          wide_screen_mode: true,
-          update_multi: true,
-        },
-        header: {
-          template: headerTemplate,
-          title: { tag: "plain_text", content: headerTitle },
-        },
-        body: {
-          elements: [
-            {
-              tag: "markdown",
-              content: this.fullText || " ",
-              element_id: "content",
-            },
-          ],
-        },
-      };
+      // 再全量更新卡片：header 改为最终状态，并去掉停止按钮
+      const finalCard = buildCardKitCardJson({
+        status: finalStatus,
+        body: this.fullText,
+        key: this.conversationKey,
+        runId: this.runId,
+        streaming: false,
+      });
       const updateRes = await fetch(`${this.baseUrl()}/open-apis/cardkit/v1/cards/${this.cardId}`, {
         method: "PUT",
         headers: { Authorization: `Bearer ${t}`, "Content-Type": "application/json" },
@@ -287,7 +271,8 @@ export class CardKitStream {
         cardId: this.cardId,
         length: this.fullText.length,
         finalStatus,
-        headerTitle,
+        headerTitle: (finalCard as any).header?.title?.content,
+        hasStopButton: JSON.stringify(finalCard).includes("停止"),
       });
     } catch (e) {
       debugLog("feishu.cardkit.close_error", {
