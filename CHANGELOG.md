@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.7](https://github.com/yangtuooc/pi-feishu-lark/compare/v0.4.6...v0.4.7) (2026-07-21)
+
+
+### Features
+
+* use Feishu CardKit streaming for soft character print ([2685a4c](https://github.com/yangtuooc/pi-feishu-lark/commit/2685a4c90b56b4dc372c5ebf8b3b3d1cff84ef24))
+
 ## [0.4.6](https://github.com/yangtuooc/pi-feishu-lark/compare/v0.4.5...v0.4.6) (2026-07-21)
 
 
