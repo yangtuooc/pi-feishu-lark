@@ -1,7 +1,8 @@
 /**
- * 单卡回复运行时：全程保留 header。
- * - running：最终可见正文流式刷新 + [停止]（不展示工具/阶段）
- * - 流式：首字尽快上屏；稳态小间隔刷新；in-flight 合并（只发最新 body，避免 API 排队卡顿）
+ * 回复呈现：
+ * - 默认 CardKit streaming_mode：客户端逐字打印（print_step=1）
+ * - 关闭流式时：先「回复中」卡，结束一次写入全文
+ * - 不展示工具/阶段过程
  */
 import { randomUUID } from "node:crypto";
 import {
@@ -9,6 +10,7 @@ import {
   defaultFinalNote,
   type ReplyCardStatus,
 } from "./card-builder.js";
+import { CardKitStream } from "./cardkit-stream.js";
 import { loadConfig } from "./config.js";
 import { debugLog } from "./debug.js";
 
@@ -30,48 +32,64 @@ export type ReplyCardSink = {
 
 export type ReplyCardStreamOptions = {
   enabled?: boolean;
-  /** 稳态 patch 间隔 ms（默认 350） */
-  flushMs?: number;
-  /** 首次出字延迟 ms（默认 50） */
-  firstFlushMs?: number;
-  /** 稳态最少新增字符（默认 8） */
-  minChars?: number;
-  maxBodyChars?: number;
+  /** CardKit 客户端打印间隔 ms（默认 50） */
+  printFrequencyMs?: number;
+  /** CardKit 每次打印字符数（默认 1） */
+  printStep?: number;
+  /** 服务端推送 fullText 到 CardKit 的间隔 ms（默认 120） */
+  pushIntervalMs?: number;
 };
 
 type ReplyCardTransport = {
   replyCard(messageId: string, card: object): Promise<string | undefined>;
   updateCard(messageId: string, card: object): Promise<void>;
+  replyPlainText?(messageId: string, text: string): Promise<string | undefined>;
+  updateText?(messageId: string, text: string): Promise<void>;
 };
 
-const DEFAULT_FLUSH_MS = 350;
-const DEFAULT_FIRST_FLUSH_MS = 50;
-const DEFAULT_MIN_CHARS = 8;
-const DEFAULT_MAX_BODY = 12000;
-
-function resolveStreamOptions(override?: ReplyCardStreamOptions): Required<ReplyCardStreamOptions> {
+function resolveStreamOptions(override?: ReplyCardStreamOptions) {
   const cfg = loadConfig();
   return {
     enabled: override?.enabled ?? cfg?.streamingReply !== false,
-    flushMs: Math.max(100, override?.flushMs ?? cfg?.streamFlushMs ?? DEFAULT_FLUSH_MS),
-    firstFlushMs: Math.max(0, override?.firstFlushMs ?? cfg?.streamFirstFlushMs ?? DEFAULT_FIRST_FLUSH_MS),
-    minChars: Math.max(1, override?.minChars ?? cfg?.streamMinChars ?? DEFAULT_MIN_CHARS),
-    maxBodyChars: Math.max(500, override?.maxBodyChars ?? cfg?.streamMaxBodyChars ?? DEFAULT_MAX_BODY),
+    printFrequencyMs: Math.max(
+      20,
+      override?.printFrequencyMs
+        ?? parseEnvInt("FEISHU_STREAM_PRINT_FREQUENCY_MS")
+        ?? cfg?.streamPrintFrequencyMs
+        ?? 50,
+    ),
+    printStep: Math.max(
+      1,
+      override?.printStep
+        ?? parseEnvInt("FEISHU_STREAM_PRINT_STEP")
+        ?? cfg?.streamPrintStep
+        ?? 1,
+    ),
+    pushIntervalMs: Math.max(
+      50,
+      override?.pushIntervalMs
+        ?? parseEnvInt("FEISHU_STREAM_PUSH_INTERVAL_MS")
+        ?? cfg?.streamPushIntervalMs
+        ?? 120,
+    ),
   };
+}
+
+function parseEnvInt(name: string): number | undefined {
+  const v = process.env[name]?.trim();
+  if (!v) return undefined;
+  const n = Number.parseInt(v, 10);
+  return Number.isFinite(n) ? n : undefined;
 }
 
 export class ReplyCard implements ReplyCardSink {
   readonly runId = randomUUID();
-  private cardMessageId: string | undefined;
   private status: ReplyCardStatus = "running";
   private body = "";
   private note: string | undefined;
-  private lastPatchedBody = "";
-  private streamTimer: NodeJS.Timeout | undefined;
-  private hasPainted = false;
-  private flushInFlight = false;
-  private flushQueued = false;
-  private readonly stream: Required<ReplyCardStreamOptions>;
+  private cardkit: CardKitStream | undefined;
+  private fallbackCardId: string | undefined;
+  private readonly streamOpts: ReturnType<typeof resolveStreamOptions>;
   private readonly key: string;
   private readonly replyToMessageId: string;
   private readonly transport: ReplyCardTransport;
@@ -85,55 +103,79 @@ export class ReplyCard implements ReplyCardSink {
     this.key = key;
     this.replyToMessageId = replyToMessageId;
     this.transport = transport;
-    this.stream = resolveStreamOptions(streamOptions);
+    this.streamOpts = resolveStreamOptions(streamOptions);
   }
 
   get messageId() {
-    return this.cardMessageId;
+    return this.fallbackCardId;
   }
 
   async start() {
-    try {
-      this.cardMessageId = await this.transport.replyCard(
+    const cfg = loadConfig();
+    if (this.streamOpts.enabled && cfg?.appId && cfg?.appSecret) {
+      this.cardkit = new CardKitStream(
+        cfg.appId,
+        cfg.appSecret,
+        cfg.domain === "lark" ? "lark" : "feishu",
         this.replyToMessageId,
-        buildReplyCard({
-          key: this.key,
-          runId: this.runId,
-          status: "running",
-          body: "",
-        }),
+        async (text) => {
+          // CardKit 失败：回落为普通最终卡片
+          const id = await this.transport.replyCard(
+            this.replyToMessageId,
+            buildReplyCard({
+              key: this.key,
+              runId: this.runId,
+              status: "done",
+              body: text,
+            }),
+          );
+          this.fallbackCardId = id;
+        },
+        {
+          printFrequencyMs: this.streamOpts.printFrequencyMs,
+          printStep: this.streamOpts.printStep,
+          pushIntervalMs: this.streamOpts.pushIntervalMs,
+        },
       );
-      this.lastPatchedBody = "";
-      this.hasPainted = false;
-      debugLog("feishu.reply_card.started", {
+      debugLog("feishu.reply_card.cardkit_ready", {
         key: this.key,
         runId: this.runId,
-        cardMessageId: this.cardMessageId,
-        stream: this.stream,
+        ...this.streamOpts,
       });
-    } catch (error) {
-      debugLog("feishu.reply_card.start_error", {
-        error: error instanceof Error ? error.message : String(error),
-      });
+      return;
     }
+
+    // 非流式：先出「回复中」占位卡
+    this.fallbackCardId = await this.transport.replyCard(
+      this.replyToMessageId,
+      buildReplyCard({
+        key: this.key,
+        runId: this.runId,
+        status: "running",
+        body: "",
+      }),
+    );
+    debugLog("feishu.reply_card.started_static", {
+      key: this.key,
+      runId: this.runId,
+      cardMessageId: this.fallbackCardId,
+    });
   }
 
   updateFromEvent(_event: unknown) {
-    // 不展示工具/阶段
+    // 不展示过程
   }
 
   append(delta: string) {
     if (this.status !== "running" || !delta) return;
     this.body += delta;
-    this.truncateBody();
-    if (!this.stream.enabled) return;
-    this.scheduleStreamFlush();
+    this.cardkit?.append(delta);
   }
 
   ensureFinal(text: string) {
     if (!text) return;
     if (!this.body.trim() || text.length >= this.body.length) this.body = text;
-    this.truncateBody();
+    this.cardkit?.ensureFinal(text);
   }
 
   async stopImmediately(note = "已停止") {
@@ -149,155 +191,49 @@ export class ReplyCard implements ReplyCardSink {
     await this.finishFinal("done", undefined);
   }
 
-  private truncateBody() {
-    const max = this.stream.maxBodyChars;
-    if (this.body.length > max) {
-      this.body = `${this.body.slice(0, max)}\n…(truncated)`;
-    }
-  }
-
-  private pendingChars() {
-    return Math.max(0, this.body.length - this.lastPatchedBody.length);
-  }
-
-  private scheduleStreamFlush() {
-    if (this.status !== "running" || !this.stream.enabled) return;
-    if (this.streamTimer) return;
-    const delay = this.hasPainted ? this.stream.flushMs : this.stream.firstFlushMs;
-    this.streamTimer = setTimeout(() => {
-      this.streamTimer = undefined;
-      void this.requestFlush();
-    }, delay);
-    this.streamTimer.unref?.();
-  }
-
-  /**
-   * 合并 patch：最多 1 个 in-flight；
-   * 飞行中继续 append 只记 dirty，落地后用最新 body 再发一次。
-   * 避免 updateCard 串行排队导致越来越卡、一次蹦一大块。
-   */
-  private async requestFlush() {
-    if (this.status !== "running" || !this.stream.enabled) return;
-    if (this.body === this.lastPatchedBody) return;
-
-    // 稳态：字数未达阈值则继续等（首屏不受限）
-    if (this.hasPainted && this.pendingChars() < this.stream.minChars) {
-      this.scheduleStreamFlush();
-      return;
-    }
-
-    if (this.flushInFlight) {
-      this.flushQueued = true;
-      return;
-    }
-
-    this.flushInFlight = true;
-    this.flushQueued = false;
-    const snapshot = this.body;
-    try {
-      if (this.cardMessageId) {
-        await this.transport.updateCard(
-          this.cardMessageId,
-          buildReplyCard({
-            key: this.key,
-            runId: this.runId,
-            status: "running",
-            body: snapshot,
-          }),
-        );
-        this.lastPatchedBody = snapshot;
-        this.hasPainted = true;
-        debugLog("feishu.reply_card.stream_flush", {
-          key: this.key,
-          runId: this.runId,
-          bodyLen: snapshot.length,
-        });
-      }
-    } catch (error) {
-      debugLog("feishu.reply_card.update_error", {
-        key: this.key,
-        runId: this.runId,
-        final: false,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    } finally {
-      this.flushInFlight = false;
-    }
-
-    if (this.status === "running" && this.body !== this.lastPatchedBody) {
-      // 有积压：尽快再刷（合并为最新）
-      if (this.flushQueued || this.pendingChars() >= this.stream.minChars) {
-        // 短延迟让出事件循环，避免 tight loop
-        this.streamTimer = setTimeout(() => {
-          this.streamTimer = undefined;
-          void this.requestFlush();
-        }, 30);
-        this.streamTimer.unref?.();
-      } else {
-        this.scheduleStreamFlush();
-      }
-    }
-  }
-
   private async finishFinal(
     status: Exclude<ReplyCardStatus, "running" | "inactive">,
     note: string | undefined,
   ) {
     if (this.status !== "running") return;
     this.status = status;
-    this.clearStreamTimer();
-    // 等飞行中的 stream patch 结束，避免乱序覆盖最终态
-    const deadline = Date.now() + 3000;
-    while (this.flushInFlight && Date.now() < deadline) {
-      await sleep(20);
-    }
     this.note = note ?? defaultFinalNote(status);
-    if (!this.cardMessageId) return;
-    const card = buildReplyCard({
-      key: this.key,
-      runId: this.runId,
-      status,
-      note: status === "done" ? undefined : this.note,
-      body: this.body,
-    });
-    try {
-      await this.transport.updateCard(this.cardMessageId, card);
-      debugLog("feishu.reply_card.update_done", {
-        key: this.key,
-        runId: this.runId,
-        messageId: this.cardMessageId,
-        final: true,
-        status: this.status,
-        bodyLen: this.body.length,
-      });
-    } catch (error) {
-      debugLog("feishu.reply_card.update_error", {
-        key: this.key,
-        runId: this.runId,
-        final: true,
-        error: error instanceof Error ? error.message : String(error),
-      });
-      await sleep(300);
+
+    if (this.cardkit) {
+      await this.cardkit.close(this.body);
+      if (status === "stopped" || status === "failed") {
+        await this.transport.replyCard(
+          this.replyToMessageId,
+          buildReplyCard({
+            key: this.key,
+            runId: this.runId,
+            status,
+            note: this.note,
+            body: this.body,
+          }),
+        );
+      }
+      return;
+    }
+
+    // 静态卡路径
+    if (this.fallbackCardId) {
       try {
-        await this.transport.updateCard(this.cardMessageId, card);
-      } catch (err2) {
-        debugLog("feishu.reply_card.final_retry_error", {
-          error: err2 instanceof Error ? err2.message : String(err2),
+        await this.transport.updateCard(
+          this.fallbackCardId,
+          buildReplyCard({
+            key: this.key,
+            runId: this.runId,
+            status,
+            note: status === "done" ? undefined : this.note,
+            body: this.body,
+          }),
+        );
+      } catch (error) {
+        debugLog("feishu.reply_card.static_final_error", {
+          error: error instanceof Error ? error.message : String(error),
         });
       }
     }
-    this.lastPatchedBody = this.body;
-    this.hasPainted = true;
   }
-
-  private clearStreamTimer() {
-    if (this.streamTimer) {
-      clearTimeout(this.streamTimer);
-      this.streamTimer = undefined;
-    }
-  }
-}
-
-function sleep(ms: number) {
-  return new Promise<void>((resolve) => setTimeout(resolve, ms));
 }

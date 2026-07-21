@@ -275,15 +275,28 @@ export class FeishuTransport {
     }
   }
 
-  async replyPlainText(messageId: string, text: string) {
+  async replyPlainText(messageId: string, text: string): Promise<string | undefined> {
     debugLog("feishu.reply.plain_text", { messageId, length: text.length });
     const chunks = splitText(text, TEXT_CHUNK_MAX_BYTES);
+    let lastId: string | undefined;
     for (const chunk of chunks) {
-      await this.apiCall("feishu.reply.plain_text", () => this.sdkClient.im.message.reply({
+      const res = await this.apiCall("feishu.reply.plain_text", () => this.sdkClient.im.message.reply({
         path: { message_id: messageId },
         data: { msg_type: "text", content: JSON.stringify({ text: chunk }) },
       }));
+      lastId = (res as any)?.data?.message_id as string | undefined;
     }
+    return lastId;
+  }
+
+  /** 更新已发出的 text 消息正文 */
+  async updateText(messageId: string, text: string) {
+    debugLog("feishu.update.text", { messageId, length: text.length });
+    const chunk = splitText(text || "…", TEXT_CHUNK_MAX_BYTES)[0] || "…";
+    await this.apiCall("feishu.update.text", () => this.sdkClient.im.v1.message.patch({
+      path: { message_id: messageId },
+      data: { content: JSON.stringify({ text: chunk }) },
+    }));
   }
 
   async sendText(chatId: string, text: string) {

@@ -126,10 +126,9 @@ export class FeishuMessageHandler {
       const useStreaming = cfg?.streamingReply !== false;
       const card = new ReplyCard(key, msg.messageId, transport, {
         enabled: useStreaming,
-        flushMs: cfg?.streamFlushMs,
-        firstFlushMs: cfg?.streamFirstFlushMs,
-        minChars: cfg?.streamMinChars,
-        maxBodyChars: cfg?.streamMaxBodyChars,
+        printFrequencyMs: cfg?.streamPrintFrequencyMs,
+        printStep: cfg?.streamPrintStep,
+        pushIntervalMs: cfg?.streamPushIntervalMs,
       });
       await card.start();
 

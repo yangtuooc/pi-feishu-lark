@@ -27,23 +27,20 @@ export type FeishuConfig = {
   /** 出站 API 最大重试次数（不含首次） */
   sendMaxRetries?: number;
   /**
-   * 是否在同一张回复卡上边生成边刷新最终可见正文（默认 true）。
-   * false：整轮结束后一次性写入全文。
+   * 是否启用流式回复（默认 true）。
+   * 使用飞书 CardKit streaming_mode，客户端按 print_step 逐字打印。
    */
   streamingReply?: boolean;
-  /**
-   * 流式 patch 最小间隔（毫秒，默认 1200）。
-   * 过小易块状闪动；过大则更新偏钝。
-   */
+  /** CardKit 客户端打印间隔 ms（默认 50） */
+  streamPrintFrequencyMs?: number;
+  /** CardKit 每次打印字符数（默认 1） */
+  streamPrintStep?: number;
+  /** 服务端推送 fullText 到 CardKit 的间隔 ms（默认 120） */
+  streamPushIntervalMs?: number;
+  /** @deprecated 兼容旧配置 */
   streamFlushMs?: number;
-  /** 首次出字延迟 ms（默认 50，尽快上屏） */
-  streamFirstFlushMs?: number;
-  /**
-   * 触发一次流式 patch 所需最少新增字符数（默认 24）。
-   * 与 streamFlushMs 一起做「时间 + 字符」双阈值，减轻整卡重绘闪动。
-   */
   streamMinChars?: number;
-  /** 流式/最终正文最大字符数（默认 12000） */
+  streamFirstFlushMs?: number;
   streamMaxBodyChars?: number;
 };
 

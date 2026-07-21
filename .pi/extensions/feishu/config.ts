@@ -30,6 +30,9 @@ export const DEFAULT_CONFIG: Pick<
   | "queueWaitTimeoutMs"
   | "sendMaxRetries"
   | "streamingReply"
+  | "streamPrintFrequencyMs"
+  | "streamPrintStep"
+  | "streamPushIntervalMs"
   | "streamFlushMs"
   | "streamFirstFlushMs"
   | "streamMinChars"
@@ -51,7 +54,11 @@ export const DEFAULT_CONFIG: Pick<
   queueWaitTimeoutMs: 3_600_000,
   sendMaxRetries: 2,
   streamingReply: true,
-  // 默认：首字快上屏 + 稳态约 350ms/8 字；in-flight 合并由 reply-card 处理
+  // CardKit 客户端逐字打印
+  streamPrintFrequencyMs: 50,
+  streamPrintStep: 1,
+  streamPushIntervalMs: 120,
+  // 兼容旧 message.patch 参数（CardKit 路径基本忽略）
   streamFlushMs: 350,
   streamFirstFlushMs: 50,
   streamMinChars: 8,
@@ -109,6 +116,9 @@ function applyRuntimeDefaults(cfg: FeishuConfig): FeishuConfig {
     queueWaitTimeoutMs: cfg.queueWaitTimeoutMs ?? DEFAULT_CONFIG.queueWaitTimeoutMs,
     sendMaxRetries: cfg.sendMaxRetries ?? DEFAULT_CONFIG.sendMaxRetries,
     streamingReply: cfg.streamingReply ?? DEFAULT_CONFIG.streamingReply,
+    streamPrintFrequencyMs: cfg.streamPrintFrequencyMs ?? DEFAULT_CONFIG.streamPrintFrequencyMs,
+    streamPrintStep: cfg.streamPrintStep ?? DEFAULT_CONFIG.streamPrintStep,
+    streamPushIntervalMs: cfg.streamPushIntervalMs ?? DEFAULT_CONFIG.streamPushIntervalMs,
     streamFlushMs: cfg.streamFlushMs ?? DEFAULT_CONFIG.streamFlushMs,
     streamFirstFlushMs: cfg.streamFirstFlushMs ?? DEFAULT_CONFIG.streamFirstFlushMs,
     streamMinChars: cfg.streamMinChars ?? DEFAULT_CONFIG.streamMinChars,
@@ -139,6 +149,9 @@ export function loadConfig(): FeishuConfig | undefined {
       queueWaitTimeoutMs: parsePositiveInt(process.env.FEISHU_QUEUE_WAIT_TIMEOUT_MS, DEFAULT_CONFIG.queueWaitTimeoutMs!),
       sendMaxRetries: parsePositiveInt(process.env.FEISHU_SEND_MAX_RETRIES, DEFAULT_CONFIG.sendMaxRetries!),
       streamingReply: parseBool(process.env.FEISHU_STREAMING_REPLY, DEFAULT_CONFIG.streamingReply!),
+      streamPrintFrequencyMs: parsePositiveInt(process.env.FEISHU_STREAM_PRINT_FREQUENCY_MS, DEFAULT_CONFIG.streamPrintFrequencyMs!),
+      streamPrintStep: parsePositiveInt(process.env.FEISHU_STREAM_PRINT_STEP, DEFAULT_CONFIG.streamPrintStep!),
+      streamPushIntervalMs: parsePositiveInt(process.env.FEISHU_STREAM_PUSH_INTERVAL_MS, DEFAULT_CONFIG.streamPushIntervalMs!),
       streamFlushMs: parsePositiveInt(process.env.FEISHU_STREAM_FLUSH_MS, DEFAULT_CONFIG.streamFlushMs!),
       streamFirstFlushMs: parsePositiveInt(process.env.FEISHU_STREAM_FIRST_FLUSH_MS, DEFAULT_CONFIG.streamFirstFlushMs!),
       streamMinChars: parsePositiveInt(process.env.FEISHU_STREAM_MIN_CHARS, DEFAULT_CONFIG.streamMinChars!),
@@ -167,6 +180,9 @@ export function loadConfig(): FeishuConfig | undefined {
     queueWaitTimeoutMs: cfg.queueWaitTimeoutMs,
     sendMaxRetries: cfg.sendMaxRetries,
     streamingReply: cfg.streamingReply,
+    streamPrintFrequencyMs: cfg.streamPrintFrequencyMs,
+    streamPrintStep: cfg.streamPrintStep,
+    streamPushIntervalMs: cfg.streamPushIntervalMs,
     streamFlushMs: cfg.streamFlushMs,
     streamFirstFlushMs: cfg.streamFirstFlushMs,
     streamMinChars: cfg.streamMinChars,
