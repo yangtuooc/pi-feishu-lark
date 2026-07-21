@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.9](https://github.com/yangtuooc/pi-feishu-lark/compare/v0.4.8...v0.4.9) (2026-07-21)
+
+
+### Bug Fixes
+
+* restore stop button on CardKit streaming cards ([18810b3](https://github.com/yangtuooc/pi-feishu-lark/commit/18810b36b58dcad67371b75c7fd15e3cbe8bc5d8))
+* restore stop button on CardKit streaming cards ([be47dfe](https://github.com/yangtuooc/pi-feishu-lark/commit/be47dfea88be8cb41852a4e4ebc18cb921ffe2ae))
+
 ## [0.4.8](https://github.com/yangtuooc/pi-feishu-lark/compare/v0.4.7...v0.4.8) (2026-07-21)
 
 
