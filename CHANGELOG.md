@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.6](https://github.com/yangtuooc/pi-feishu-lark/compare/v0.4.5...v0.4.6) (2026-07-21)
+
+
+### Bug Fixes
+
+* coalesce stream patches for smoother card updates ([25dff1a](https://github.com/yangtuooc/pi-feishu-lark/commit/25dff1a32e843f20c46909e21dd7b6c581b1766a))
+
 ## [0.4.5](https://github.com/yangtuooc/pi-feishu-lark/compare/v0.4.4...v0.4.5) (2026-07-20)
 
 
