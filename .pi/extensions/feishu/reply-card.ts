@@ -135,6 +135,8 @@ export class ReplyCard implements ReplyCardSink {
           printFrequencyMs: this.streamOpts.printFrequencyMs,
           printStep: this.streamOpts.printStep,
           pushIntervalMs: this.streamOpts.pushIntervalMs,
+          conversationKey: this.key,
+          runId: this.runId,
         },
       );
       debugLog("feishu.reply_card.cardkit_ready", {
