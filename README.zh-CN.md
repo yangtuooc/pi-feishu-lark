@@ -122,8 +122,9 @@ pi install npm:@xjuai/pi-feishu-lark -a
 | `FEISHU_QUEUE_WAIT_TIMEOUT_MS` | `3600000` | 等待上一轮队列超时 |
 | `FEISHU_SEND_MAX_RETRIES` | `2` | 出站 API 重试次数（不含首次） |
 | `FEISHU_STREAMING_REPLY` | `true` | 同一张卡边生成边刷新最终可见正文 |
-| `FEISHU_STREAM_FLUSH_MS` | `400` | 流式 patch 最小间隔（毫秒） |
-| `FEISHU_STREAM_MIN_CHARS` | `1` | 触发 patch 的最少新增字符数 |
+| `FEISHU_STREAM_FLUSH_MS` | `350` | 流式 patch 最小间隔（毫秒） |
+| `FEISHU_STREAM_FIRST_FLUSH_MS` | `50` | 首次出字延迟（毫秒） |
+| `FEISHU_STREAM_MIN_CHARS` | `8` | 触发 patch 的最少新增字符数 |
 | `FEISHU_STREAM_MAX_BODY_CHARS` | `12000` | 卡片正文最大字符数 |
 | `FEISHU_AUTO_START` | `true` | Pi 启动时自动连接 |
 | `FEISHU_LANGUAGE` | `zh` | `zh` / `en` |

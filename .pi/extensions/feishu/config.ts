@@ -31,6 +31,7 @@ export const DEFAULT_CONFIG: Pick<
   | "sendMaxRetries"
   | "streamingReply"
   | "streamFlushMs"
+  | "streamFirstFlushMs"
   | "streamMinChars"
   | "streamMaxBodyChars"
 > = {
@@ -50,9 +51,10 @@ export const DEFAULT_CONFIG: Pick<
   queueWaitTimeoutMs: 3_600_000,
   sendMaxRetries: 2,
   streamingReply: true,
-  // 默认偏跟手：400ms + 1 字即可 patch；可用 env 调大以减少闪动
-  streamFlushMs: 400,
-  streamMinChars: 1,
+  // 默认：首字快上屏 + 稳态约 350ms/8 字；in-flight 合并由 reply-card 处理
+  streamFlushMs: 350,
+  streamFirstFlushMs: 50,
+  streamMinChars: 8,
   streamMaxBodyChars: 12000,
 };
 
@@ -108,6 +110,7 @@ function applyRuntimeDefaults(cfg: FeishuConfig): FeishuConfig {
     sendMaxRetries: cfg.sendMaxRetries ?? DEFAULT_CONFIG.sendMaxRetries,
     streamingReply: cfg.streamingReply ?? DEFAULT_CONFIG.streamingReply,
     streamFlushMs: cfg.streamFlushMs ?? DEFAULT_CONFIG.streamFlushMs,
+    streamFirstFlushMs: cfg.streamFirstFlushMs ?? DEFAULT_CONFIG.streamFirstFlushMs,
     streamMinChars: cfg.streamMinChars ?? DEFAULT_CONFIG.streamMinChars,
     streamMaxBodyChars: cfg.streamMaxBodyChars ?? DEFAULT_CONFIG.streamMaxBodyChars,
   };
@@ -137,6 +140,7 @@ export function loadConfig(): FeishuConfig | undefined {
       sendMaxRetries: parsePositiveInt(process.env.FEISHU_SEND_MAX_RETRIES, DEFAULT_CONFIG.sendMaxRetries!),
       streamingReply: parseBool(process.env.FEISHU_STREAMING_REPLY, DEFAULT_CONFIG.streamingReply!),
       streamFlushMs: parsePositiveInt(process.env.FEISHU_STREAM_FLUSH_MS, DEFAULT_CONFIG.streamFlushMs!),
+      streamFirstFlushMs: parsePositiveInt(process.env.FEISHU_STREAM_FIRST_FLUSH_MS, DEFAULT_CONFIG.streamFirstFlushMs!),
       streamMinChars: parsePositiveInt(process.env.FEISHU_STREAM_MIN_CHARS, DEFAULT_CONFIG.streamMinChars!),
       streamMaxBodyChars: parsePositiveInt(process.env.FEISHU_STREAM_MAX_BODY_CHARS, DEFAULT_CONFIG.streamMaxBodyChars!),
     });
@@ -164,6 +168,7 @@ export function loadConfig(): FeishuConfig | undefined {
     sendMaxRetries: cfg.sendMaxRetries,
     streamingReply: cfg.streamingReply,
     streamFlushMs: cfg.streamFlushMs,
+    streamFirstFlushMs: cfg.streamFirstFlushMs,
     streamMinChars: cfg.streamMinChars,
     streamMaxBodyChars: cfg.streamMaxBodyChars,
   });

@@ -127,6 +127,7 @@ export class FeishuMessageHandler {
       const card = new ReplyCard(key, msg.messageId, transport, {
         enabled: useStreaming,
         flushMs: cfg?.streamFlushMs,
+        firstFlushMs: cfg?.streamFirstFlushMs,
         minChars: cfg?.streamMinChars,
         maxBodyChars: cfg?.streamMaxBodyChars,
       });

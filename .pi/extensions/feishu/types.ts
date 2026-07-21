@@ -36,6 +36,8 @@ export type FeishuConfig = {
    * 过小易块状闪动；过大则更新偏钝。
    */
   streamFlushMs?: number;
+  /** 首次出字延迟 ms（默认 50，尽快上屏） */
+  streamFirstFlushMs?: number;
   /**
    * 触发一次流式 patch 所需最少新增字符数（默认 24）。
    * 与 streamFlushMs 一起做「时间 + 字符」双阈值，减轻整卡重绘闪动。
