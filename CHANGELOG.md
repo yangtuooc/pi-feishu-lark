@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.8](https://github.com/yangtuooc/pi-feishu-lark/compare/v0.4.7...v0.4.8) (2026-07-21)
+
+
+### Bug Fixes
+
+* update CardKit header after stream completes ([759e55d](https://github.com/yangtuooc/pi-feishu-lark/commit/759e55d6ec7ef490f873a33a52e09def6e4e801d))
+* update CardKit header to 回复 after stream completes ([3be7548](https://github.com/yangtuooc/pi-feishu-lark/commit/3be75486a32f0049d07aeaf84ac92722e48cfde5))
+
 ## [0.4.7](https://github.com/yangtuooc/pi-feishu-lark/compare/v0.4.6...v0.4.7) (2026-07-21)
 
 
