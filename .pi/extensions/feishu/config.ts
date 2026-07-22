@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync, rmSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
+import { parseGroupKeywords } from "./group-trigger.js";
 import type { CardActionMode, Domain, FeishuConfig, GroupPolicy } from "./types.js";
 
 export const ROOT_DIR = join(homedir(), ".pi", "agent", "feishu");
@@ -16,6 +17,8 @@ export const DEFAULT_CONFIG: Pick<
   FeishuConfig,
   | "domain"
   | "groupPolicy"
+  | "groupKeywords"
+  | "groupAlsoOnReply"
   | "cardActionMode"
   | "cardActionWebhookHost"
   | "cardActionWebhookPort"
@@ -40,6 +43,8 @@ export const DEFAULT_CONFIG: Pick<
 > = {
   domain: "feishu",
   groupPolicy: "open",
+  groupKeywords: [],
+  groupAlsoOnReply: false,
   cardActionMode: "webhook",
   cardActionWebhookHost: "0.0.0.0",
   cardActionWebhookPort: 3001,
@@ -109,6 +114,10 @@ function parsePositiveInt(value: unknown, fallback: number): number {
 function applyRuntimeDefaults(cfg: FeishuConfig): FeishuConfig {
   return {
     ...cfg,
+    groupKeywords: Array.isArray(cfg.groupKeywords)
+      ? parseGroupKeywords(cfg.groupKeywords)
+      : (cfg.groupKeywords ?? DEFAULT_CONFIG.groupKeywords),
+    groupAlsoOnReply: cfg.groupAlsoOnReply ?? DEFAULT_CONFIG.groupAlsoOnReply,
     parseInteractiveCards: cfg.parseInteractiveCards ?? DEFAULT_CONFIG.parseInteractiveCards,
     includeQuotedMessage: cfg.includeQuotedMessage ?? DEFAULT_CONFIG.includeQuotedMessage,
     quotedMessageMaxChars: cfg.quotedMessageMaxChars ?? DEFAULT_CONFIG.quotedMessageMaxChars,
@@ -135,6 +144,8 @@ export function loadConfig(): FeishuConfig | undefined {
       appSecret: envSecret,
       domain: (process.env.FEISHU_DOMAIN as Domain) || DEFAULT_CONFIG.domain,
       groupPolicy: (process.env.FEISHU_GROUP_POLICY as GroupPolicy) || DEFAULT_CONFIG.groupPolicy,
+      groupKeywords: parseGroupKeywords(process.env.FEISHU_GROUP_KEYWORDS),
+      groupAlsoOnReply: parseBool(process.env.FEISHU_GROUP_ALSO_ON_REPLY, DEFAULT_CONFIG.groupAlsoOnReply!),
       cardActionMode: parseCardActionMode(process.env.FEISHU_CARD_ACTION_MODE) || DEFAULT_CONFIG.cardActionMode,
       cardActionWebhookHost: process.env.FEISHU_CARD_ACTION_WEBHOOK_HOST?.trim() || DEFAULT_CONFIG.cardActionWebhookHost,
       cardActionWebhookPort: parsePort(process.env.FEISHU_CARD_ACTION_WEBHOOK_PORT) ?? DEFAULT_CONFIG.cardActionWebhookPort,
@@ -166,6 +177,8 @@ export function loadConfig(): FeishuConfig | undefined {
     appSecret: cfg.appSecret,
     domain: cfg.domain || DEFAULT_CONFIG.domain,
     groupPolicy: cfg.groupPolicy || DEFAULT_CONFIG.groupPolicy,
+    groupKeywords: parseGroupKeywords(cfg.groupKeywords),
+    groupAlsoOnReply: parseBool(cfg.groupAlsoOnReply, DEFAULT_CONFIG.groupAlsoOnReply!),
     cardActionMode: parseCardActionMode(cfg.cardActionMode) || DEFAULT_CONFIG.cardActionMode,
     cardActionWebhookHost: cfg.cardActionWebhookHost || DEFAULT_CONFIG.cardActionWebhookHost,
     cardActionWebhookPort: typeof cfg.cardActionWebhookPort === "number" ? cfg.cardActionWebhookPort : DEFAULT_CONFIG.cardActionWebhookPort,

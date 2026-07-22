@@ -7,6 +7,16 @@ export type FeishuConfig = {
   appSecret: string;
   domain: Domain;
   groupPolicy: GroupPolicy;
+  /**
+   * 群聊关键词触发（与 mention 叠加）：正文命中任一关键词即可，无需 @。
+   * 匹配：去空白后大小写不敏感子串。
+   */
+  groupKeywords?: string[];
+  /**
+   * 群聊跟帖触发（与 mention 叠加）：回复本 bot 消息时触发，无需再 @。
+   * 默认 false。
+   */
+  groupAlsoOnReply?: boolean;
   cardActionMode?: CardActionMode;
   cardActionWebhookHost?: string;
   cardActionWebhookPort?: number;
