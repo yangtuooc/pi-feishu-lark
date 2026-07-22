@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.10](https://github.com/yangtuooc/pi-feishu-lark/compare/v0.4.9...v0.4.10) (2026-07-22)
+
+
+### Bug Fixes
+
+* return schema 2.0 card on stop callback for CardKit stream ([#12](https://github.com/yangtuooc/pi-feishu-lark/issues/12)) ([9b4b9b0](https://github.com/yangtuooc/pi-feishu-lark/commit/9b4b9b095969e39538547ad1d734dffe719e2ab2))
+
 ## [0.4.9](https://github.com/yangtuooc/pi-feishu-lark/compare/v0.4.8...v0.4.9) (2026-07-21)
 
 
