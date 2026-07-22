@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.12](https://github.com/yangtuooc/pi-feishu-lark/compare/v0.4.11...v0.4.12) (2026-07-22)
+
+
+### Bug Fixes
+
+* clarify feishu_config_set is hot-reload, no restart ([e7d6a65](https://github.com/yangtuooc/pi-feishu-lark/commit/e7d6a65742d9955e8ce9bbadce624bab0c60ae08))
+* feishu_config_set guidance — hot-reload, never restart ([c8c64bf](https://github.com/yangtuooc/pi-feishu-lark/commit/c8c64bffa142ae2fb872da00b612259e2f2fbf66))
+
 ## [0.4.11](https://github.com/yangtuooc/pi-feishu-lark/compare/v0.4.10...v0.4.11) (2026-07-22)
 
 
