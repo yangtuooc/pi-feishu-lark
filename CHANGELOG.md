@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.4.11](https://github.com/yangtuooc/pi-feishu-lark/compare/v0.4.10...v0.4.11) (2026-07-22)
+
+
+### Features
+
+* group keyword + alsoOnReply triggers (P0) ([ae1d6fd](https://github.com/yangtuooc/pi-feishu-lark/commit/ae1d6fd009c96a0c625b00e9be01f55d9abe91d5))
+* group keyword + alsoOnReply triggers (P0) ([6876653](https://github.com/yangtuooc/pi-feishu-lark/commit/6876653e3e41c4e74741b1391f014e6e02c213fd)), closes [#14](https://github.com/yangtuooc/pi-feishu-lark/issues/14)
+* runtime config via /config and agent tools ([8c1f474](https://github.com/yangtuooc/pi-feishu-lark/commit/8c1f4745365e86af210b0cd8b1e28c18ae862bc4))
+* runtime config via /config and agent tools ([17b4682](https://github.com/yangtuooc/pi-feishu-lark/commit/17b4682ace05fb06a07058e3f917d71b4a2d8920))
+
 ## [0.4.10](https://github.com/yangtuooc/pi-feishu-lark/compare/v0.4.9...v0.4.10) (2026-07-22)
 
 
