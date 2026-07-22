@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, openSync, readFileSync, rmSync, statSync } from 
 import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
 import { buildModelCard, buildResumeCard, parseModelActionValue, parseResumePageActionValue, parseResumeSelectActionValue } from "./cards.js";
 import { BRIDGE_PATH, CHILD_SESSION_ENV, CONFIG_PATH, DAEMON_LOG_PATH, DEBUG_LOG_PATH, DEDUPE_PATH, ensureRoot, loadConfig, mask, removePath, STATE_PATH, writeJson } from "./config.js";
 import { debugLog } from "./debug.js";
@@ -14,6 +15,13 @@ import { FeishuMessageHandler } from "./message-handler.js";
 import { runSetup, uiConfirm } from "./setup.js";
 import { buildCardKitCardJson } from "./card-builder.js";
 import { buildReplyCard, parseStopTaskActionValue } from "./reply-card.js";
+import {
+  RUNTIME_CONFIG_KEYS,
+  clearRuntimeOverrides,
+  formatRuntimeConfig,
+  getRuntimeOverrides,
+  setRuntimeConfig,
+} from "./runtime-config.js";
 import { BotUnavailableError, FeishuTransport } from "./transport.js";
 import type { FeishuConfig, FeishuStatus } from "./types.js";
 
@@ -21,6 +29,9 @@ export default function feishuExtension(pi: ExtensionAPI) {
   if (process.env[CHILD_SESSION_ENV] === "1") {
     return;
   }
+
+  // 模型可读写白名单配置（热更新 + 落盘）
+  registerFeishuConfigTools(pi);
 
   let transport: FeishuTransport | undefined;
   let gatewayLock: GatewayLockHandle | undefined;
@@ -601,4 +612,87 @@ function tryAcquireSpawnLock(lockPath: string) {
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function textToolResult(text: string) {
+  return {
+    content: [{ type: "text" as const, text }],
+    details: {},
+  };
+}
+
+function registerFeishuConfigTools(pi: ExtensionAPI) {
+  pi.registerTool({
+    name: "feishu_config_get",
+    label: "Feishu Config Get",
+    description:
+      "Read Feishu runtime config whitelist (groupPolicy, groupKeywords, streaming, etc). Secrets are never returned.",
+    promptSnippet: "Read Feishu bot runtime settings (keywords, mention policy, streaming).",
+    parameters: Type.Object({}),
+    async execute() {
+      const cfg = loadConfig();
+      if (!cfg) {
+        return textToolResult("Feishu config unavailable (missing FEISHU_APP_ID/SECRET).");
+      }
+      return textToolResult(formatRuntimeConfig(cfg, getRuntimeOverrides()));
+    },
+  });
+
+  pi.registerTool({
+    name: "feishu_config_set",
+    label: "Feishu Config Set",
+    description:
+      `Set a Feishu runtime config key (hot-reload + persist to runtime-overrides.json). Allowed keys: ${RUNTIME_CONFIG_KEYS.join(", ")}. Do not set appId/appSecret.`,
+    promptSnippet: "Update Feishu group trigger keywords / streaming / emoji at runtime.",
+    promptGuidelines: [
+      "Only use whitelisted keys; never attempt to set app credentials.",
+      "After set, subsequent group messages use the new settings immediately.",
+    ],
+    parameters: Type.Object({
+      key: Type.String({ description: `One of: ${RUNTIME_CONFIG_KEYS.join(", ")}` }),
+      value: Type.String({ description: "New value (keywords comma-separated; bool true/false; numbers as digits)" }),
+    }),
+    async execute(_id, params) {
+      const key = String((params as any)?.key || "").trim();
+      const value = String((params as any)?.value ?? "");
+      if (!key) return textToolResult("key is required");
+      const result = setRuntimeConfig(key, value);
+      if (result.ok === false) return textToolResult(`Error: ${result.error}`);
+      const cfg = loadConfig();
+      return textToolResult(
+        [
+          `Updated ${result.key} = ${Array.isArray(result.value) ? result.value.join(", ") : String(result.value)}`,
+          "Hot-reloaded and persisted (runtime-overrides.json).",
+          "",
+          cfg ? formatRuntimeConfig(cfg, getRuntimeOverrides()) : "",
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      );
+    },
+  });
+
+  pi.registerTool({
+    name: "feishu_config_clear",
+    label: "Feishu Config Clear",
+    description: "Clear one runtime override key or all overrides (reverts to env/base config).",
+    parameters: Type.Object({
+      key: Type.Optional(Type.String({ description: "Whitelist key, or omit/all for all overrides" })),
+    }),
+    async execute(_id, params) {
+      const target = String((params as any)?.key || "all").trim() || "all";
+      const result = clearRuntimeOverrides(target);
+      if (result.ok === false) return textToolResult(`Error: ${result.error}`);
+      const cfg = loadConfig();
+      return textToolResult(
+        [
+          target === "all" ? "Cleared all runtime overrides." : `Cleared override: ${target}`,
+          "",
+          cfg ? formatRuntimeConfig(cfg, getRuntimeOverrides()) : "",
+        ]
+          .filter(Boolean)
+          .join("\n"),
+      );
+    },
+  });
 }

@@ -117,6 +117,29 @@ pi install npm:@xjuai/pi-feishu-lark -a
 | `FEISHU_GROUP_POLICY` | `open` | `open` (all messages) / `mention` (@ required) |
 | `FEISHU_GROUP_KEYWORDS` | — | Comma/semicolon keywords; stacked on `mention` — match without @ (case-insensitive substring after whitespace normalize) |
 | `FEISHU_GROUP_ALSO_ON_REPLY` | `false` | When `true`, replies to this bot also trigger without @ (stacked on `mention`) |
+
+### Runtime config (hot-reload + persist)
+
+Whitelist settings can be changed in chat and take effect immediately. Values are written to `~/.pi/agent/feishu/runtime-overrides.json` and override env for those keys only (**never secrets**).
+
+**Feishu commands**
+
+```text
+/config
+/config groupKeywords name1,name2
+/config groupAlsoOnReply true
+/config clear groupKeywords
+/config clear all
+```
+
+**Agent tools**
+
+- `feishu_config_get`
+- `feishu_config_set` (`key`, `value`)
+- `feishu_config_clear` (`key` optional)
+
+Allowed keys: `groupPolicy`, `groupKeywords`, `groupAlsoOnReply`, `reactEmoji`, `language`, `streamingReply`, `streamPrintFrequencyMs`, `streamPrintStep`, `streamPushIntervalMs`.  
+Forbidden: `appId` / `appSecret` / connection channel settings.
 | `FEISHU_PARSE_INTERACTIVE_CARDS` | `true` | Parse inbound interactive cards |
 | `FEISHU_INCLUDE_QUOTED_MESSAGE` | `true` | Expand quoted/parent messages |
 | `FEISHU_QUOTED_MESSAGE_MAX_CHARS` | `8000` | Max chars for quoted body |
@@ -136,6 +159,7 @@ pi install npm:@xjuai/pi-feishu-lark -a
 | Path | Content |
 |------|---------|
 | `~/.pi/agent/feishu/config.json` | Credentials and config |
+| `~/.pi/agent/feishu/runtime-overrides.json` | Runtime whitelist overrides (hot-reload) |
 | `~/.pi/agent/feishu/state.json` | Feishu ↔ Pi session mapping |
 | `~/.pi/agent/feishu/bridge.json` | Routes (e.g. scheduled jobs) |
 | `~/.pi/agent/feishu/debug.log` | Debug log |

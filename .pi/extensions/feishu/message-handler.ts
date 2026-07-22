@@ -4,6 +4,12 @@ import type { ConversationManager } from "./conversation-manager.js";
 import { claimFeishuMessage, markFeishuMessage } from "./dedupe-store.js";
 import { debugLog } from "./debug.js";
 import { loadConfig } from "./config.js";
+import {
+  clearRuntimeOverrides,
+  formatRuntimeConfig,
+  getRuntimeOverrides,
+  setRuntimeConfig,
+} from "./runtime-config.js";
 import { conversationKey, conversationLabel, buildPromptWithQuote, getCommandList, normalizeForDedupe, parseBotCommand, parseMessageInput, pruneRecentMap } from "./messages.js";
 import { ReplyCard } from "./reply-card.js";
 import type { FeishuBridgeStore } from "./bridge-store.js";
@@ -227,6 +233,57 @@ export class FeishuMessageHandler {
 
     if (command.name === "commands") {
       await transport.replyText(msg.messageId, `可用命令：\n${getCommandList()}`);
+      return true;
+    }
+
+    if (command.name === "config") {
+      if (command.clearTarget) {
+        const cleared = clearRuntimeOverrides(command.clearTarget);
+        if (cleared.ok === false) {
+          await transport.replyText(msg.messageId, `❌ ${cleared.error}`);
+          return true;
+        }
+        const cfg = loadConfig();
+        await transport.replyText(
+          msg.messageId,
+          [
+            command.clearTarget === "all" ? "已清除全部 runtime overrides" : `已清除 override: ${command.clearTarget}`,
+            "",
+            cfg ? formatRuntimeConfig(cfg, getRuntimeOverrides()) : "配置不可用",
+          ].join("\n"),
+        );
+        return true;
+      }
+      if (command.key) {
+        if (command.value === undefined || command.value === "") {
+          await transport.replyText(
+            msg.messageId,
+            `用法: /config ${command.key} <value>\n或: /config clear ${command.key}`,
+          );
+          return true;
+        }
+        const set = setRuntimeConfig(command.key, command.value);
+        if (set.ok === false) {
+          await transport.replyText(msg.messageId, `❌ ${set.error}`);
+          return true;
+        }
+        const cfg = loadConfig();
+        await transport.replyText(
+          msg.messageId,
+          [
+            `✅ 已更新 ${set.key} = ${Array.isArray(set.value) ? set.value.join(", ") : String(set.value)}`,
+            "已热更新并落盘（runtime-overrides.json）",
+            "",
+            cfg ? formatRuntimeConfig(cfg, getRuntimeOverrides()) : "",
+          ].filter(Boolean).join("\n"),
+        );
+        return true;
+      }
+      const cfg = loadConfig();
+      await transport.replyText(
+        msg.messageId,
+        cfg ? formatRuntimeConfig(cfg, getRuntimeOverrides()) : "配置不可用（缺少 FEISHU_APP_ID/SECRET）",
+      );
       return true;
     }
 

@@ -1,4 +1,5 @@
 import type { FeishuCardAction, FeishuConfig, FeishuMessage } from "./types.js";
+import { loadConfig } from "./config.js";
 import { debugLog } from "./debug.js";
 import {
   extractPlainTextForTrigger,
@@ -45,6 +46,11 @@ export class FeishuTransport {
     private readonly onMessage: (msg: FeishuMessage) => Promise<void>,
     private readonly onCardAction: (action: FeishuCardAction) => Promise<object | undefined | void>,
   ) {}
+
+  /** 热读有效配置（含 runtime-overrides）；失败回退 constructor 快照 */
+  private effectiveConfig(): FeishuConfig {
+    return loadConfig() || this.config;
+  }
 
   async start() {
     if (this.running) return;
@@ -151,17 +157,18 @@ export class FeishuTransport {
       content: message.content || "",
     });
 
+    const cfg = this.effectiveConfig();
     if (message.chat_type === "group") {
       const text = extractPlainTextForTrigger(message.message_type || "text", message.content || "");
       const mentioned = this.isMentioned(message);
       const replyToBot = this.isReplyToBot(message);
       const decision = shouldAcceptGroupMessage({
         chatType: "group",
-        groupPolicy: this.config.groupPolicy,
+        groupPolicy: cfg.groupPolicy,
         mentioned,
         text,
-        keywords: this.config.groupKeywords || [],
-        alsoOnReply: Boolean(this.config.groupAlsoOnReply),
+        keywords: cfg.groupKeywords || [],
+        alsoOnReply: Boolean(cfg.groupAlsoOnReply),
         replyToBot,
       });
       if (!decision.accept) {
@@ -170,7 +177,7 @@ export class FeishuTransport {
           reason: decision.reason,
           mentioned,
           replyToBot,
-          keywords: this.config.groupKeywords || [],
+          keywords: cfg.groupKeywords || [],
         });
         return;
       }
@@ -197,8 +204,8 @@ export class FeishuTransport {
       mentions: message.mentions,
     };
 
-    if (this.config.reactEmoji) {
-      void this.addReaction(msg.messageId, this.config.reactEmoji);
+    if (cfg.reactEmoji) {
+      void this.addReaction(msg.messageId, cfg.reactEmoji);
     }
     debugLog("feishu.message.dispatch", { messageId: msg.messageId });
     void this.onMessage(msg).catch((error) => {
