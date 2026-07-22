@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync, rmSync }
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { parseGroupKeywords } from "./group-trigger.js";
+import { applyRuntimeOverrides, getRuntimeOverrides } from "./runtime-config.js";
 import type { CardActionMode, Domain, FeishuConfig, GroupPolicy } from "./types.js";
 
 export const ROOT_DIR = join(homedir(), ".pi", "agent", "feishu");
@@ -136,6 +137,14 @@ function applyRuntimeDefaults(cfg: FeishuConfig): FeishuConfig {
 }
 
 export function loadConfig(): FeishuConfig | undefined {
+  const base = loadBaseConfig();
+  if (!base) return undefined;
+  // runtime-overrides 覆盖 env/config 中的白名单字段（热更新 + 落盘）
+  return applyRuntimeOverrides(base, getRuntimeOverrides());
+}
+
+/** 不含 runtime overrides 的基础配置（env 或 config.json） */
+export function loadBaseConfig(): FeishuConfig | undefined {
   const envAppId = process.env.FEISHU_APP_ID?.trim();
   const envSecret = process.env.FEISHU_APP_SECRET?.trim();
   if (envAppId && envSecret) {

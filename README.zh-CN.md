@@ -117,6 +117,30 @@ pi install npm:@xjuai/pi-feishu-lark -a
 | `FEISHU_GROUP_POLICY` | `open` | `open`（群内均可）/ `mention`（需 @ 机器人） |
 | `FEISHU_GROUP_KEYWORDS` | — | 群聊关键词触发（逗号/分号分隔），与 `mention` 叠加：命中即可无需 @。匹配为去空白后大小写不敏感子串 |
 | `FEISHU_GROUP_ALSO_ON_REPLY` | `false` | `true` 时回复本 bot 消息也会触发（无需再 @），与 `mention` 叠加 |
+
+### 运行时配置（热更新 + 落盘）
+
+除 env 外，可通过对话修改白名单配置，立即生效并写入 `~/.pi/agent/feishu/runtime-overrides.json`（覆盖 env 中同名项；**不含密钥**）。
+
+**飞书命令**
+
+```text
+/config                         # 查看有效配置
+/config groupKeywords 志胜,zs   # 设置关键词
+/config groupAlsoOnReply true
+/config streamingReply false
+/config clear groupKeywords     # 清除单项 override
+/config clear all               # 清除全部 overrides
+```
+
+**模型 Tool**
+
+- `feishu_config_get` — 读取白名单配置
+- `feishu_config_set` — 设置 `key`/`value`
+- `feishu_config_clear` — 清除 override
+
+可改项：`groupPolicy` `groupKeywords` `groupAlsoOnReply` `reactEmoji` `language` `streamingReply` `streamPrintFrequencyMs` `streamPrintStep` `streamPushIntervalMs`  
+禁止：`appId` / `appSecret` / 连接通道相关项。
 | `FEISHU_PARSE_INTERACTIVE_CARDS` | `true` | 解析入站 interactive 卡片 |
 | `FEISHU_INCLUDE_QUOTED_MESSAGE` | `true` | 展开引用/回复的父消息 |
 | `FEISHU_QUOTED_MESSAGE_MAX_CHARS` | `8000` | 引用正文最大字符数 |
@@ -136,6 +160,7 @@ pi install npm:@xjuai/pi-feishu-lark -a
 | 路径 | 内容 |
 |------|------|
 | `~/.pi/agent/feishu/config.json` | 凭证与配置 |
+| `~/.pi/agent/feishu/runtime-overrides.json` | 运行时白名单配置覆盖（热更新落盘） |
 | `~/.pi/agent/feishu/state.json` | 飞书 ↔ Pi 会话映射 |
 | `~/.pi/agent/feishu/bridge.json` | 定时任务等路由 |
 | `~/.pi/agent/feishu/debug.log` | 调试日志 |

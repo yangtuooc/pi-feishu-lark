@@ -8,7 +8,8 @@ export type BotCommand =
   | { name: "stop" }
   | { name: "workspace"; path?: string }
   | { name: "status" }
-  | { name: "commands" };
+  | { name: "commands" }
+  | { name: "config"; key?: string; value?: string; clearTarget?: string };
 
 type PostBody = {
   title?: string;
@@ -113,6 +114,18 @@ export function parseBotCommand(text: string): BotCommand | undefined {
   if (workspaceMatch) {
     return { name: "workspace", path: workspaceMatch[1]?.trim() };
   }
+  const configMatch = trimmed.match(/^\/config(?:\s+(.+))?$/s);
+  if (configMatch) {
+    const rest = (configMatch[1] || "").trim();
+    if (!rest) return { name: "config" };
+    const parts = rest.split(/\s+/);
+    if (parts[0] === "clear") {
+      return { name: "config", clearTarget: parts[1] || "all" };
+    }
+    const key = parts[0];
+    const value = rest.slice(key.length).trim();
+    return { name: "config", key, value: value || undefined };
+  }
   return undefined;
 }
 
@@ -124,6 +137,9 @@ export function getCommandList(): string {
     "/workspace [path] — 切换工作区",
     "/status — 查看当前模型/目录/状态",
     "/stop — 停止当前生成",
+    "/config — 查看/修改运行时配置（群触发、流式等）",
+    "/config <key> <value> — 设置白名单配置并立即生效",
+    "/config clear [key|all] — 清除 runtime overrides",
     "/commands — 显示命令列表",
   ].join("\n");
 }

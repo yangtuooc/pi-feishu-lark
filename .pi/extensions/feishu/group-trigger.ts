@@ -1,5 +1,3 @@
-import type { GroupPolicy } from "./types.js";
-
 export type GroupTriggerDecision = {
   accept: boolean;
   reason:
@@ -14,7 +12,7 @@ export type GroupTriggerDecision = {
 
 export type GroupTriggerInput = {
   chatType: "p2p" | "group" | string;
-  groupPolicy: GroupPolicy;
+  groupPolicy: "open" | "mention";
   mentioned: boolean;
   text: string;
   keywords: string[];
