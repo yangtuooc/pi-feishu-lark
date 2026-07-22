@@ -21,6 +21,8 @@ export type CardKitStreamOptions = {
   conversationKey?: string;
   /** 本轮 runId，用于停止按钮回调 */
   runId?: string;
+  /** 记录本 bot 发出的消息 id（供 groupAlsoOnReply） */
+  onOutboundMessageId?: (messageId: string) => void;
 };
 
 export class CardKitStream {
@@ -39,6 +41,7 @@ export class CardKitStream {
   private readonly pushIntervalMs: number;
   private readonly conversationKey?: string;
   private readonly runId?: string;
+  private readonly onOutboundMessageId?: (messageId: string) => void;
 
   constructor(
     private readonly appId: string,
@@ -53,6 +56,7 @@ export class CardKitStream {
     this.pushIntervalMs = Math.max(50, options?.pushIntervalMs ?? 120);
     this.conversationKey = options?.conversationKey;
     this.runId = options?.runId;
+    this.onOutboundMessageId = options?.onOutboundMessageId;
   }
 
   private baseUrl() {
@@ -107,12 +111,15 @@ export class CardKitStream {
           content: JSON.stringify({ type: "card", data: { card_id: this.cardId } }),
         }),
       });
-      const s = (await sr.json()) as CardKitResponse;
+      const s = (await sr.json()) as CardKitResponse & { data?: { message_id?: string } };
       if (s.code !== 0) {
         throw Object.assign(new Error(`reply_card: ${s.msg || s.code}`), { code: s.code });
       }
+      const outboundId = s.data?.message_id;
+      if (outboundId) this.onOutboundMessageId?.(outboundId);
       debugLog("feishu.cardkit.started", {
         cardId: this.cardId,
+        messageId: outboundId,
         printFrequencyMs: this.printFrequencyMs,
         printStep: this.printStep,
       });

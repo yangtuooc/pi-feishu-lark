@@ -115,6 +115,8 @@ pi install npm:@xjuai/pi-feishu-lark -a
 | `FEISHU_APP_ID` / `FEISHU_APP_SECRET` | — | App credentials |
 | `FEISHU_DOMAIN` | `feishu` | `feishu` / `lark` |
 | `FEISHU_GROUP_POLICY` | `open` | `open` (all messages) / `mention` (@ required) |
+| `FEISHU_GROUP_KEYWORDS` | — | Comma/semicolon keywords; stacked on `mention` — match without @ (case-insensitive substring after whitespace normalize) |
+| `FEISHU_GROUP_ALSO_ON_REPLY` | `false` | When `true`, replies to this bot also trigger without @ (stacked on `mention`) |
 | `FEISHU_PARSE_INTERACTIVE_CARDS` | `true` | Parse inbound interactive cards |
 | `FEISHU_INCLUDE_QUOTED_MESSAGE` | `true` | Expand quoted/parent messages |
 | `FEISHU_QUOTED_MESSAGE_MAX_CHARS` | `8000` | Max chars for quoted body |

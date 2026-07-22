@@ -45,6 +45,8 @@ type ReplyCardTransport = {
   updateCard(messageId: string, card: object): Promise<void>;
   replyPlainText?(messageId: string, text: string): Promise<string | undefined>;
   updateText?(messageId: string, text: string): Promise<void>;
+  /** 记录本 bot 出站消息，供 groupAlsoOnReply */
+  rememberOutboundMessageId?(messageId: string): void;
 };
 
 function resolveStreamOptions(override?: ReplyCardStreamOptions) {
@@ -137,6 +139,7 @@ export class ReplyCard implements ReplyCardSink {
           pushIntervalMs: this.streamOpts.pushIntervalMs,
           conversationKey: this.key,
           runId: this.runId,
+          onOutboundMessageId: (id) => this.transport.rememberOutboundMessageId?.(id),
         },
       );
       debugLog("feishu.reply_card.cardkit_ready", {

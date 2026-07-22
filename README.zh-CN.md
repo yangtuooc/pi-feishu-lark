@@ -115,6 +115,8 @@ pi install npm:@xjuai/pi-feishu-lark -a
 | `FEISHU_APP_ID` / `FEISHU_APP_SECRET` | — | 应用凭证 |
 | `FEISHU_DOMAIN` | `feishu` | `feishu` / `lark` |
 | `FEISHU_GROUP_POLICY` | `open` | `open`（群内均可）/ `mention`（需 @ 机器人） |
+| `FEISHU_GROUP_KEYWORDS` | — | 群聊关键词触发（逗号/分号分隔），与 `mention` 叠加：命中即可无需 @。匹配为去空白后大小写不敏感子串 |
+| `FEISHU_GROUP_ALSO_ON_REPLY` | `false` | `true` 时回复本 bot 消息也会触发（无需再 @），与 `mention` 叠加 |
 | `FEISHU_PARSE_INTERACTIVE_CARDS` | `true` | 解析入站 interactive 卡片 |
 | `FEISHU_INCLUDE_QUOTED_MESSAGE` | `true` | 展开引用/回复的父消息 |
 | `FEISHU_QUOTED_MESSAGE_MAX_CHARS` | `8000` | 引用正文最大字符数 |
