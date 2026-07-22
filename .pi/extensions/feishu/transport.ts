@@ -208,11 +208,9 @@ export class FeishuTransport {
   }
 
   private async handleCardActionAction(action: FeishuCardAction, mode: "ws" | "webhook") {
-    const result = await this.onCardAction(action);
-    if (mode === "ws" && result) {
-      await this.updateCard(action.messageId, result);
-    }
-    return result;
+    // 仅返回回调响应即可；不要再 im.message.patch 一份 schema 1.0，
+    // 否则会把 CardKit schema 2.0 卡改坏（200830 / 前端 200671）。
+    return this.onCardAction(action);
   }
 
   private cardActionMode() {

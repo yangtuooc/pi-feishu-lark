@@ -12,6 +12,7 @@ import { FeishuDelivery } from "./delivery.js";
 import { acquireGatewayLock, gatewayLockPath, readGatewayOwner, type GatewayLockHandle, type GatewayOwner } from "./gateway-lock.js";
 import { FeishuMessageHandler } from "./message-handler.js";
 import { runSetup, uiConfirm } from "./setup.js";
+import { buildCardKitCardJson } from "./card-builder.js";
 import { buildReplyCard, parseStopTaskActionValue } from "./reply-card.js";
 import { BotUnavailableError, FeishuTransport } from "./transport.js";
 import type { FeishuConfig, FeishuStatus } from "./types.js";
@@ -165,12 +166,13 @@ export default function feishuExtension(pi: ExtensionAPI) {
           cardMessageId: action.messageId,
           result: result.status,
         });
-        // 卡片回调同步返回最终样式（与 patch 一致，带 header）
-        return buildReplyCard({
+        // CardKit 流式卡是 schema 2.0；回调必须返回 2.0，否则会 200830/200671
+        return buildCardKitCardJson({
+          status,
+          body: result.message || "已停止",
           key: stopTask.key,
           runId: stopTask.runId,
-          status,
-          note: result.message || "已停止",
+          streaming: false,
         });
       }
       const resumePage = parseResumePageActionValue(action.value);
