@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.14](https://github.com/yangtuooc/pi-feishu-lark/compare/v0.4.13...v0.4.14) (2026-07-23)
+
+
+### Features
+
+* configurable ignoreBotMessages for bot-origin messages ([#26](https://github.com/yangtuooc/pi-feishu-lark/issues/26)) ([2b2c806](https://github.com/yangtuooc/pi-feishu-lark/commit/2b2c80688f0042cee25c9ae5651fed83026fa6e1))
+
 ## [0.4.13](https://github.com/yangtuooc/pi-feishu-lark/compare/v0.4.12...v0.4.13) (2026-07-23)
 
 
