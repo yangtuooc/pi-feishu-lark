@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.13](https://github.com/yangtuooc/pi-feishu-lark/compare/v0.4.12...v0.4.13) (2026-07-23)
+
+
+### Features
+
+* groupKeywords match interactive card text ([#23](https://github.com/yangtuooc/pi-feishu-lark/issues/23)) ([b0704f6](https://github.com/yangtuooc/pi-feishu-lark/commit/b0704f62f7aec090aa625514430377f5d4bff901)), closes [#22](https://github.com/yangtuooc/pi-feishu-lark/issues/22)
+
 ## [0.4.12](https://github.com/yangtuooc/pi-feishu-lark/compare/v0.4.11...v0.4.12) (2026-07-22)
 
 
