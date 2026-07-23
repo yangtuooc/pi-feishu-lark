@@ -145,19 +145,27 @@ export class FeishuTransport {
     const message = event?.message;
     const sender = event?.sender;
     if (!message) return;
-    if (sender?.sender_type === "bot") return;
+
+    const cfg = this.effectiveConfig();
+    if (sender?.sender_type === "bot" && cfg.ignoreBotMessages !== false) {
+      debugLog("feishu.message.ignored_bot", {
+        messageId: message.message_id,
+        messageType: message.message_type,
+      });
+      return;
+    }
 
     debugLog("feishu.message.received", {
       messageId: message.message_id,
       chatType: message.chat_type,
       messageType: message.message_type,
+      senderType: sender?.sender_type || "unknown",
       hasRootId: Boolean(message.root_id),
       hasParentId: Boolean(message.parent_id),
       hasThreadId: Boolean(message.thread_id),
       content: message.content || "",
     });
 
-    const cfg = this.effectiveConfig();
     if (message.chat_type === "group") {
       const text = extractPlainTextForTrigger(message.message_type || "text", message.content || "");
       const mentioned = this.isMentioned(message);

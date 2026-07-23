@@ -8,6 +8,7 @@ export const RUNTIME_CONFIG_KEYS = [
   "groupPolicy",
   "groupKeywords",
   "groupAlsoOnReply",
+  "ignoreBotMessages",
   "reactEmoji",
   "language",
   "streamingReply",
@@ -23,6 +24,7 @@ export type RuntimeConfigView = {
   groupPolicy?: "open" | "mention";
   groupKeywords?: string[];
   groupAlsoOnReply?: boolean;
+  ignoreBotMessages?: boolean;
   reactEmoji?: string;
   language?: "zh" | "en";
   streamingReply?: boolean;
@@ -66,6 +68,7 @@ export function parseRuntimeConfigValue(key: string, raw: string): ParseResult {
       return { ok: true, value: text };
     }
     case "groupAlsoOnReply":
+    case "ignoreBotMessages":
     case "streamingReply": {
       const b = parseBoolStrict(text);
       if (b === undefined) return { ok: false, error: `${key} 请使用 true/false/1/0` };
@@ -206,6 +209,7 @@ export function formatRuntimeConfig(cfg: RuntimeConfigView, overrides?: RuntimeO
     `groupPolicy: ${cfg.groupPolicy}${mark("groupPolicy")}`,
     `groupKeywords: ${kw}${mark("groupKeywords")}`,
     `groupAlsoOnReply: ${Boolean(cfg.groupAlsoOnReply)}${mark("groupAlsoOnReply")}`,
+    `ignoreBotMessages: ${cfg.ignoreBotMessages !== false}${mark("ignoreBotMessages")}`,
     `reactEmoji: ${cfg.reactEmoji || ""}${mark("reactEmoji")}`,
     `language: ${cfg.language || "zh"}${mark("language")}`,
     `streamingReply: ${cfg.streamingReply !== false}${mark("streamingReply")}`,

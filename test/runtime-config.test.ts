@@ -35,6 +35,7 @@ test("isRuntimeConfigKey only allows whitelist", () => {
   assert.equal(isRuntimeConfigKey("groupKeywords"), true);
   assert.equal(isRuntimeConfigKey("groupPolicy"), true);
   assert.equal(isRuntimeConfigKey("streamingReply"), true);
+  assert.equal(isRuntimeConfigKey("ignoreBotMessages"), true);
   assert.equal(isRuntimeConfigKey("appId"), false);
   assert.equal(isRuntimeConfigKey("appSecret"), false);
   assert.equal(isRuntimeConfigKey("cardActionMode"), false);
@@ -48,6 +49,8 @@ test("parseRuntimeConfigValue for keywords / bool / enum / number", () => {
   });
   assert.deepEqual(parseRuntimeConfigValue("groupAlsoOnReply", "true"), { ok: true, value: true });
   assert.deepEqual(parseRuntimeConfigValue("groupAlsoOnReply", "0"), { ok: true, value: false });
+  assert.deepEqual(parseRuntimeConfigValue("ignoreBotMessages", "false"), { ok: true, value: false });
+  assert.deepEqual(parseRuntimeConfigValue("ignoreBotMessages", "1"), { ok: true, value: true });
   assert.deepEqual(parseRuntimeConfigValue("groupPolicy", "open"), { ok: true, value: "open" });
   assert.equal(parseRuntimeConfigValue("groupPolicy", "admin").ok, false);
   assert.deepEqual(parseRuntimeConfigValue("language", "en"), { ok: true, value: "en" });
@@ -99,11 +102,17 @@ test("set/get/clear runtime overrides persist on disk", () => {
 
 test("formatRuntimeConfig shows effective values", () => {
   const text = formatRuntimeConfig(
-    baseCfg({ groupKeywords: ["志胜"], groupAlsoOnReply: true, streamingReply: false }),
+    baseCfg({
+      groupKeywords: ["志胜"],
+      groupAlsoOnReply: true,
+      ignoreBotMessages: false,
+      streamingReply: false,
+    }),
   );
   assert.match(text, /groupPolicy:\s*mention/);
   assert.match(text, /groupKeywords:\s*志胜/);
   assert.match(text, /groupAlsoOnReply:\s*true/);
+  assert.match(text, /ignoreBotMessages:\s*false/);
   assert.match(text, /streamingReply:\s*false/);
   assert.doesNotMatch(text, /appSecret/);
 });
