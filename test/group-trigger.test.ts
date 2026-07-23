@@ -36,6 +36,54 @@ test("extractPlainTextForTrigger reads text/post content", () => {
   assert.match(extractPlainTextForTrigger("post", post), /正文/);
 });
 
+test("extractPlainTextForTrigger reads interactive card text", () => {
+  const card = JSON.stringify({
+    header: { title: { tag: "plain_text", content: "告警通知" } },
+    elements: [
+      { tag: "div", text: { tag: "plain_text", content: "志胜请处理这条告警" } },
+    ],
+  });
+  const text = extractPlainTextForTrigger("interactive", card);
+  assert.match(text, /志胜/);
+  assert.match(text, /告警/);
+});
+
+test("mention policy: accept interactive when keyword in card body", () => {
+  const card = JSON.stringify({
+    elements: [{ tag: "div", text: { tag: "plain_text", content: "请志胜帮忙看下" } }],
+  });
+  const text = extractPlainTextForTrigger("interactive", card);
+  const r = shouldAcceptGroupMessage({
+    chatType: "group",
+    groupPolicy: "mention",
+    mentioned: false,
+    text,
+    keywords: ["志胜"],
+    alsoOnReply: false,
+    replyToBot: false,
+  });
+  assert.equal(r.accept, true);
+  assert.equal(r.reason, "keyword");
+});
+
+test("mention policy: reject interactive without keyword/mention/reply", () => {
+  const card = JSON.stringify({
+    elements: [{ tag: "div", text: { tag: "plain_text", content: "普通卡片内容" } }],
+  });
+  const text = extractPlainTextForTrigger("interactive", card);
+  const r = shouldAcceptGroupMessage({
+    chatType: "group",
+    groupPolicy: "mention",
+    mentioned: false,
+    text,
+    keywords: ["志胜"],
+    alsoOnReply: true,
+    replyToBot: false,
+  });
+  assert.equal(r.accept, false);
+  assert.equal(r.reason, "not_mentioned");
+});
+
 test("open policy always accepts group messages", () => {
   const r = shouldAcceptGroupMessage({
     chatType: "group",

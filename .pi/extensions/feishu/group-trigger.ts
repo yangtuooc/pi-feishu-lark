@@ -1,3 +1,5 @@
+import { extractTextFromInteractiveCard } from "./interactive-card.js";
+
 export type GroupTriggerDecision = {
   accept: boolean;
   reason:
@@ -47,6 +49,14 @@ export function textMatchesKeywords(text: string, keywords: string[]): boolean {
 
 /** 从飞书原始 content JSON 抽触发用纯文本（轻量，不依赖完整 parseMessageInput） */
 export function extractPlainTextForTrigger(msgType: string, content: string): string {
+  // interactive 卡片：复用完整抽取，供 groupKeywords 子串匹配
+  if (msgType === "interactive") {
+    try {
+      return extractTextFromInteractiveCard(content, { maxChars: 4000 }).text.trim();
+    } catch {
+      return "";
+    }
+  }
   try {
     const json = JSON.parse(content || "{}");
     if (msgType === "text") {
