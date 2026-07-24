@@ -23,6 +23,7 @@ export {
 
 export type ReplyCardSink = {
   readonly runId: string;
+  readonly bodyText: string;
   updateFromEvent(event: unknown): void;
   stopImmediately(note?: string): Promise<void>;
   finish(status: Exclude<ReplyCardStatus, "running" | "inactive">, note?: string): Promise<void>;
@@ -89,6 +90,7 @@ export class ReplyCard implements ReplyCardSink {
   private status: ReplyCardStatus = "running";
   private body = "";
   private note: string | undefined;
+  get bodyText() { return this.body; }
   private cardkit: CardKitStream | undefined;
   private fallbackCardId: string | undefined;
   private readonly streamOpts: ReturnType<typeof resolveStreamOptions>;

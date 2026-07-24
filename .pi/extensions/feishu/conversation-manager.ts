@@ -27,7 +27,7 @@ type ActiveRun = {
 };
 
 export type StopConversationResult =
-  | { status: "stopped"; message: string }
+  | { status: "stopped"; message: string; body: string }
   | { status: "not_running"; message: string }
   | { status: "stale"; message: string }
   | { status: "failed"; message: string };
@@ -193,13 +193,14 @@ export class ConversationManager {
     }
 
     active.stopped = true;
+    const body = active.status?.bodyText || "";
     await active.status?.stopImmediately("已停止");
     try {
       await active.session.abort();
       debugLog("feishu.prompt.abort", { key });
       const message = "已停止";
       await onReply(message);
-      return { status: "stopped", message };
+      return { status: "stopped", message, body };
     } catch (error) {
       active.stopped = false;
       debugLog("feishu.prompt.abort_error", { key, error: error instanceof Error ? error.message : String(error) });
