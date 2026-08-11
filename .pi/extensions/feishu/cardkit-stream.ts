@@ -29,9 +29,13 @@ export class CardKitStream {
   private cardId: string | null = null;
   private fullText = "";
   private lastSent = "";
+  private processMarkdown = "";
+  private processTimer: ReturnType<typeof setTimeout> | null = null;
   private token: string | null = null;
   private tokenExpiry = 0;
   private sequence = 1;
+  /** 串行化护栏：同一时刻最多 1 个 CardKit PUT 在途，避免请求堆积卡顿 */
+  private putting = false;
   private interval: ReturnType<typeof setInterval> | null = null;
   private startPromise: Promise<void> | null = null;
   private closed = false;
@@ -90,6 +94,7 @@ export class CardKitStream {
         streaming: true,
         printFrequencyMs: this.printFrequencyMs,
         printStep: this.printStep,
+        processMarkdown: this.processMarkdown,
       });
 
       const cr = await fetch(`${this.baseUrl()}/open-apis/cardkit/v1/cards`, {
@@ -134,7 +139,16 @@ export class CardKitStream {
   append(delta: string): void {
     if (this.closed || this.failed || !delta) return;
     this.fullText += delta;
-    if (!this.cardId && !this.startPromise) {
+    void this.ensureStarted();
+  }
+
+  /**
+   * 幂等创建卡片（可在 thinking/tool 阶段提前调用，让过程区块先展示）。
+   * 正文未开始前调用安全：interval 在 fullText 为空时不会发 PUT。
+   */
+  ensureStarted(): Promise<void> {
+    if (this.cardId || this.failed || this.closed) return Promise.resolve();
+    if (!this.startPromise) {
       this.startPromise = this.start()
         .catch((e) => {
           this.failed = true;
@@ -146,6 +160,7 @@ export class CardKitStream {
           this.startPromise = null;
         });
     }
+    return this.startPromise;
   }
 
   ensureFinal(text: string): void {
@@ -156,8 +171,15 @@ export class CardKitStream {
   }
 
   private async tick() {
-    if (!this.cardId || this.closed || this.fullText === this.lastSent) return;
-    await this.putContent(this.fullText);
+    // 有 PUT 在途则跳过本轮（下一个 120ms 会带着最新全文补上）
+    if (!this.cardId || this.closed || this.putting) return;
+    if (this.fullText === this.lastSent) return;
+    this.putting = true;
+    try {
+      await this.putContent(this.fullText);
+    } finally {
+      this.putting = false;
+    }
   }
 
   private async putContent(text: string) {
@@ -194,12 +216,76 @@ export class CardKitStream {
   }
 
   /**
+   * 更新「思考与工具」过程区块（element_id=process）。
+   * 120ms 去抖，最新内容胜出；卡片未建时仅存值（start 时会带上）。
+   * 正文开始流式后冻结：流式期间改 process 元素会打断 content 的逐字打印（实测闪烁），
+   * 此时只存值（close 时过程区块会被最终卡移除）。
+   */
+  updateProcess(markdown: string): void {
+    this.processMarkdown = markdown;
+    if (this.closed || this.failed || !this.cardId) return;
+    if (this.fullText) {
+      // 正文流式中：冻结，不 PUT
+      return;
+    }
+    if (this.processTimer) clearTimeout(this.processTimer);
+    this.processTimer = setTimeout(() => {
+      this.processTimer = null;
+      void this.putProcess();
+    }, 120);
+  }
+
+  private async putProcess(): Promise<void> {
+    if (!this.cardId || this.closed || this.failed) return;
+    // 正文流式中：不 PUT（避免打断逐字打印）
+    if (this.fullText) return;
+    // 正文 PUT 在途时稍后重试，保证最新过程内容最终送达
+    if (this.putting) {
+      this.processTimer = setTimeout(() => {
+        this.processTimer = null;
+        void this.putProcess();
+      }, 150);
+      return;
+    }
+    this.putting = true;
+    try {
+      const t = await this.getToken();
+      const seq = ++this.sequence;
+      const res = await fetch(
+        `${this.baseUrl()}/open-apis/cardkit/v1/cards/${this.cardId}/elements/process/content`,
+        {
+          method: "PUT",
+          headers: { Authorization: `Bearer ${t}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            content: this.processMarkdown || " ",
+            sequence: seq,
+            uuid: `p_${this.cardId}_${seq}`,
+          }),
+        },
+      );
+      if (!res.ok) {
+        debugLog("feishu.cardkit.process_update_error", {
+          seq,
+          status: res.status,
+          body: (await res.text()).slice(0, 200),
+        });
+      }
+    } catch (e) {
+      debugLog("feishu.cardkit.process_update_throw", {
+        error: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      this.putting = false;
+    }
+  }
+
+  /**
    * 结束流式：
    * 1) 推送最终正文
    * 2) 关闭 streaming_mode
-   * 3) 全量更新卡片（header 改为「回复」/绿，避免一直停在「回复中」）
+   * 3) 全量更新卡片（header 改为「回复」/绿，去掉过程区块与停止按钮，附统计页脚）
    */
-  async close(finalText?: string, finalStatus: "done" | "stopped" | "failed" = "done"): Promise<void> {
+  async close(finalText?: string, finalStatus: "done" | "stopped" | "failed" = "done", footerMarkdown?: string): Promise<void> {
     if (this.closed) return;
     this.closed = true;
     if (finalText) this.ensureFinal(finalText);
@@ -252,6 +338,7 @@ export class CardKitStream {
         key: this.conversationKey,
         runId: this.runId,
         streaming: false,
+        footerMarkdown: finalStatus === "done" ? footerMarkdown : undefined,
       });
       const updateRes = await fetch(`${this.baseUrl()}/open-apis/cardkit/v1/cards/${this.cardId}`, {
         method: "PUT",
