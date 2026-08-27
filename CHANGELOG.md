@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.15](https://github.com/yangtuooc/pi-feishu-lark/compare/v0.4.14...v0.4.15) (2026-08-27)
+
+
+### Features
+
+* **cardkit:** 卡片展示思考与工具过程及完成统计页脚 ([#32](https://github.com/yangtuooc/pi-feishu-lark/issues/32)) ([7513a47](https://github.com/yangtuooc/pi-feishu-lark/commit/7513a475c285199b8ab089fcbb2020cef526233d))
+
+
+### Bug Fixes
+
+* CardKit 停止按钮不再覆盖已输出的累计文本 ([#30](https://github.com/yangtuooc/pi-feishu-lark/issues/30)) ([94dcbbd](https://github.com/yangtuooc/pi-feishu-lark/commit/94dcbbd39041ddc988531fbda46ef197389a26f6))
+
 ## [0.4.14](https://github.com/yangtuooc/pi-feishu-lark/compare/v0.4.13...v0.4.14) (2026-07-23)
 
 
