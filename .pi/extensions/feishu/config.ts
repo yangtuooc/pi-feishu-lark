@@ -38,6 +38,7 @@ export const DEFAULT_CONFIG: Pick<
   | "streamPrintFrequencyMs"
   | "streamPrintStep"
   | "streamPushIntervalMs"
+  | "cardShowProcess"
   | "streamFlushMs"
   | "streamFirstFlushMs"
   | "streamMinChars"
@@ -62,6 +63,7 @@ export const DEFAULT_CONFIG: Pick<
   queueWaitTimeoutMs: 3_600_000,
   sendMaxRetries: 2,
   streamingReply: true,
+  cardShowProcess: true,
   // CardKit 客户端逐字打印
   streamPrintFrequencyMs: 50,
   streamPrintStep: 1,
@@ -129,6 +131,7 @@ function applyRuntimeDefaults(cfg: FeishuConfig): FeishuConfig {
     queueWaitTimeoutMs: cfg.queueWaitTimeoutMs ?? DEFAULT_CONFIG.queueWaitTimeoutMs,
     sendMaxRetries: cfg.sendMaxRetries ?? DEFAULT_CONFIG.sendMaxRetries,
     streamingReply: cfg.streamingReply ?? DEFAULT_CONFIG.streamingReply,
+    cardShowProcess: cfg.cardShowProcess ?? DEFAULT_CONFIG.cardShowProcess,
     streamPrintFrequencyMs: cfg.streamPrintFrequencyMs ?? DEFAULT_CONFIG.streamPrintFrequencyMs,
     streamPrintStep: cfg.streamPrintStep ?? DEFAULT_CONFIG.streamPrintStep,
     streamPushIntervalMs: cfg.streamPushIntervalMs ?? DEFAULT_CONFIG.streamPushIntervalMs,

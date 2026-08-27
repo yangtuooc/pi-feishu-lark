@@ -130,11 +130,14 @@ export class FeishuMessageHandler {
       const prompt = buildPromptWithQuote(basePrompt, quoted);
       // 单卡：全程 header；流式参数来自 config/env
       const useStreaming = cfg?.streamingReply !== false;
+      const actualModel = await this.conversations.getActualModel(key);
       const card = new ReplyCard(key, msg.messageId, transport, {
         enabled: useStreaming,
         printFrequencyMs: cfg?.streamPrintFrequencyMs,
         printStep: cfg?.streamPrintStep,
         pushIntervalMs: cfg?.streamPushIntervalMs,
+      }, {
+        model: actualModel,
       });
       await card.start();
 

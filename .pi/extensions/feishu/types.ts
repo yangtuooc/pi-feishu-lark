@@ -47,6 +47,11 @@ export type FeishuConfig = {
   streamPrintFrequencyMs?: number;
   /** CardKit 每次打印字符数（默认 1） */
   streamPrintStep?: number;
+  /**
+   * 是否在卡片内展示过程（思考摘要 + 工具调用 timeline，默认 true）。
+   * 参考 Hermes streaming-card：运行中显示「思考与工具」区块，完成后收起。
+   */
+  cardShowProcess?: boolean;
   /** 服务端推送 fullText 到 CardKit 的间隔 ms（默认 120） */
   streamPushIntervalMs?: number;
   /** @deprecated 兼容旧配置 */

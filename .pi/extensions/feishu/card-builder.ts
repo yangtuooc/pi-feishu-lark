@@ -34,6 +34,10 @@ export function buildCardKitCardJson(input: {
   streaming?: boolean;
   printFrequencyMs?: number;
   printStep?: number;
+  /** 运行中显示的「思考与工具」过程区块（element_id=process，可动态更新） */
+  processMarkdown?: string;
+  /** 完成后的统计页脚（element_id=footer） */
+  footerMarkdown?: string;
 }) {
   const running = input.status === "running";
   const body = (input.body || "").trim();
@@ -41,6 +45,13 @@ export function buildCardKitCardJson(input: {
   const elements: object[] = [];
 
   if (running) {
+    if (input.processMarkdown !== undefined) {
+      elements.push({
+        tag: "markdown",
+        content: input.processMarkdown || " ",
+        element_id: "process",
+      });
+    }
     elements.push({
       tag: "markdown",
       content: body || "…",
@@ -55,6 +66,13 @@ export function buildCardKitCardJson(input: {
       content: body || " ",
       element_id: "content",
     });
+    if (input.footerMarkdown) {
+      elements.push({
+        tag: "markdown",
+        content: input.footerMarkdown,
+        element_id: "footer",
+      });
+    }
   } else {
     const parts: string[] = [];
     if (note) parts.push(note);
@@ -101,6 +119,8 @@ export function buildReplyCard(input: {
   note?: string;
   body?: string;
   runId?: string;
+  /** 完成后的统计页脚 */
+  footerMarkdown?: string;
 }) {
   const running = input.status === "running";
   const body = (input.body || "").trim();
@@ -129,6 +149,12 @@ export function buildReplyCard(input: {
       tag: "div",
       text: { tag: "lark_md", content: body || " " },
     });
+    if (input.footerMarkdown) {
+      elements.push({
+        tag: "div",
+        text: { tag: "lark_md", content: input.footerMarkdown },
+      });
+    }
   } else {
     if (note) {
       elements.push({
