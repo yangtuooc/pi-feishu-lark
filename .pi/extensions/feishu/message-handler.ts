@@ -130,14 +130,11 @@ export class FeishuMessageHandler {
       const prompt = buildPromptWithQuote(basePrompt, quoted);
       // 单卡：全程 header；流式参数来自 config/env
       const useStreaming = cfg?.streamingReply !== false;
-      const actualModel = await this.conversations.getActualModel(key);
       const card = new ReplyCard(key, msg.messageId, transport, {
         enabled: useStreaming,
         printFrequencyMs: cfg?.streamPrintFrequencyMs,
         printStep: cfg?.streamPrintStep,
         pushIntervalMs: cfg?.streamPushIntervalMs,
-      }, {
-        model: actualModel,
       });
       await card.start();
 
@@ -175,7 +172,7 @@ export class FeishuMessageHandler {
     }
 
     if (command.name === "model") {
-      const models = this.conversations.getAvailableModels();
+      const models = await this.conversations.getAvailableModels();
       if (!models.length) {
         await transport.replyText(msg.messageId, "当前没有可用模型。请先在 Pi 里完成模型登录或 API Key 配置。");
         return true;

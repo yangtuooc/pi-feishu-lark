@@ -178,10 +178,9 @@ export default function feishuExtension(pi: ExtensionAPI) {
           result: result.status,
         });
         // CardKit 流式卡是 schema 2.0；回调必须返回 2.0，否则会 200830/200671
-        // body 优先用 cardkit.close() 已写入的累计文本，避免覆盖已输出内容
         return buildCardKitCardJson({
           status,
-          body: "body" in result ? result.body : result.message || "已停止",
+          body: result.message || "已停止",
           key: stopTask.key,
           runId: stopTask.runId,
           streaming: false,
@@ -205,7 +204,7 @@ export default function feishuExtension(pi: ExtensionAPI) {
       await conversations.selectModel(selected.key, selected.provider, selected.modelId, async (reply) => {
         await transport?.replyText(action.messageId, reply);
       });
-      const models = conversations.getAvailableModels();
+      const models = await conversations.getAvailableModels();
       const currentModel = await conversations.getSelectedModel(selected.key);
       return buildModelCard(selected.key, models, currentModel);
     });
